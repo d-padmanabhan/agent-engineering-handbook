@@ -476,6 +476,21 @@ All documents should follow this structure:
 
 ---
 
+## Line wrapping
+
+Do **not** hard-wrap Markdown prose at a fixed column. Let the renderer or editor soft-wrap long lines instead. Hard wraps in prose cause noisy diffs when a single sentence is edited (every line below the change shifts), and modern viewers (GitHub, Cursor, VS Code, static site generators) all soft-wrap by default so readers never see the hard breaks.
+
+**Rules:**
+
+- Prose paragraphs: one paragraph per line (no hard wrap at 80/100/any column).
+- Lists, tables, code blocks, front matter, and Mermaid diagrams: break as the format requires.
+- Blockquotes (including GitHub alerts): each quoted paragraph on one line.
+- This applies to all `.md` and `.mdx` files in the workspace.
+
+**Repo configs already align:** most repos have `MD013: false` in `.markdownlint.yaml` and Prettier's default `proseWrap: "preserve"`, so neither tool will re-wrap your output. This rule ensures generated content matches that.
+
+---
+
 ## Links and URLs
 
 This applies to **all** Markdown and MDX in the workspace (READMEs, rules, docs, ADRs, PR bodies when using Markdown, etc.).
