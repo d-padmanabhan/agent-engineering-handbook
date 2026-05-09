@@ -69,6 +69,57 @@ http.request.uri.path contains "/admin"
 
 ---
 
+## Cloudflare Access vs AOP vs Worker JWT validation - layering rule
+
+Cloudflare offers three identity surfaces in front of an origin. Use each for what it actually adds; do not duplicate the same authentication decision at multiple layers.
+
+| Layer | What it answers | Identity source |
+|---|---|---|
+| **Cloudflare Access** | "Should this request reach the origin at all?" | IdP (Okta, McKinsey ID, etc.) for users; service auth tokens or mTLS for machines |
+| **Authenticated Origin Pulls (AOP)** | "Did this request actually come from Cloudflare?" | mTLS cert from Cloudflare to the origin |
+| **Worker JWT validation** | "Does this specific API call have the right scope/audience/tenant?" | The same Access JWT (`Cf-Access-Jwt-Assertion`) or a separate token |
+| **Origin JWT validation** | "Same as above, but enforced at the origin" | Same |
+
+### Decision matrix
+
+| Layer | Usually redundant | Still useful |
+|---|---|---|
+| **Cloudflare Access** | Re-validating the same IdP token, same issuer/audience/group already enforced at the IdP | Centralized edge authorization for coarse route access; device posture; service auth tokens for machine callers |
+| **Worker JWT validation** | Repeating Access policy checks with no new claims or route-specific logic | API-specific checks: audience, scope, tenant, route, method, fine-grained claim conditions |
+| **Origin JWT validation** | A second full interactive login after Access | Lightweight verification of `Cf-Access-Jwt-Assertion`, AOP/mTLS, service-specific authorization |
+
+**Rule of thumb:** **do not duplicate the same authentication decision. Add another layer only when it enforces a different boundary or finer-grained authorization.**
+
+### Authentication vs authorization (recap)
+
+- **Authentication** answers "who is calling?" - IdP, mTLS cert, service token.
+- **Authorization** answers "what can this caller do here?" - policy, scope, tenant.
+
+Cloudflare Access can do both at the *edge*: IdP claims, group selectors, service tokens, mTLS certs, device posture. For most web apps, that is enough route-level authorization at the edge.
+
+For application-specific authorization, use a policy engine closer to the business domain:
+
+| Need | Typical tool |
+|---|---|
+| Edge reachability + coarse route access | Cloudflare Access policies |
+| Origin proves request came from Cloudflare | Authenticated Origin Pulls |
+| API-specific scopes, tenants, roles, resources | Application code, Worker logic, or a policy engine |
+| Centralized fine-grained authorization | AWS Verified Permissions / Cedar; Open Policy Agent |
+| AWS-to-AWS service invocation | VPC Lattice + IAM/SigV4 (see `412-aws-iam.mdc`) |
+
+Cloudflare Workers with KV/D1 can implement custom authorization, but that is custom code. For centralized auditable fine-grained authorization, prefer policy-as-code (Verified Permissions, Cedar, OPA) over scattered Worker logic.
+
+### Common mistakes
+
+- **Worker that re-validates the Access JWT** with no extra check. The validation runs on every request for no security benefit. Either drop the Worker check, or have it enforce *something different* (scope, tenant, route).
+- **Origin doing a second full OIDC login** after Access already authenticated. Use `Cf-Access-Jwt-Assertion` instead.
+- **Origin without AOP** when the route is "behind" Cloudflare. The origin is still reachable directly by IP. Either restrict ingress to Cloudflare IPs *and* enforce AOP, or accept that a determined attacker bypasses Cloudflare.
+- **Service tokens used as bearer-tokens-in-the-clear** without IP allowlisting or expiration discipline. Treat service tokens like any other long-lived credential - or replace with mTLS.
+
+See also: `316-zero-trust.mdc`, `318-workload-identity.mdc`, `412-aws-iam.mdc`.
+
+---
+
 ## Quick Reference
 
 ### Essential Commands

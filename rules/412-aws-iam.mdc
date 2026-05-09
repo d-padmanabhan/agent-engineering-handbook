@@ -227,6 +227,118 @@ Example (CloudTrail writing to S3; restrict by source account):
 > Prefer **both** `aws:SourceAccount` and `aws:SourceArn` where supported by the calling service.
 > Check the specific service’s docs for supported keys.
 
+## VPC Lattice + `AWS_IAM` + SigV4 - the AWS-native workload-identity pattern
+
+For AWS workload-to-workload HTTPS calls, this is the Zero Trust default before reaching for SPIRE/mTLS. See `318-workload-identity.mdc` for the cross-cloud comparison; this section is the AWS-IAM-side mechanics.
+
+### Four enforcement layers (all must pass)
+
+```mermaid
+flowchart LR
+    src["Source workload<br/>(Lambda / ECS / EKS / EC2)"]
+    src -->|"1. IAM identity policy<br/>vpc-lattice-svcs:Invoke"| iam[IAM evaluation]
+    iam -->|"allowed"| sig["2. SigV4 signature<br/>service: vpc-lattice-svcs"]
+    sig -->|"3. Network path<br/>via VPC association"| lat["VPC Lattice service"]
+    lat -->|"4. Lattice auth policy<br/>resource-based"| origin["Origin<br/>(ALB / NLB / Lambda / Fargate)"]
+```
+
+1. **IAM identity policy** on the caller principal grants `vpc-lattice-svcs:Invoke` on the target service ARN.
+2. **SigV4 signature** with signing name `vpc-lattice-svcs`, region of the service, payload `UNSIGNED-PAYLOAD` (Lattice does not currently support payload signing).
+3. **Network path** - caller reaches the service via its VPC association. No internet exposure required.
+4. **Lattice auth policy** (resource-based, attached to the service or service network) explicitly permits the caller principal.
+
+### Why this is legitimately Zero Trust
+
+- Short-lived credentials via STS (mitigates NHI7 - long-lived secrets).
+- No static keys to leak (mitigates NHI2).
+- IAM principal is attested by the cloud control plane - the workload can't forge its identity any more than a SPIRE-attested pod can.
+- Authorization happens before reaching the origin.
+- Traffic stays on the AWS private network; no internet hairpin.
+
+### Caller IAM identity policy
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "vpc-lattice-svcs:Invoke",
+    "Resource": "arn:aws:vpc-lattice:us-east-1:111122223333:service/svc-abc/*"
+  }]
+}
+```
+
+Attach to the workload's IAM role (Lambda execution role / ECS task role / IRSA / Pod Identity / EC2 instance role).
+
+### Lattice auth policy (resource-based)
+
+Default-deny by absence of allow statements. Allow specific caller principals:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "AllowPaymentsService",
+    "Effect": "Allow",
+    "Principal": { "AWS": "arn:aws:iam::111122223333:role/payments-service" },
+    "Action": "vpc-lattice-svcs:Invoke",
+    "Resource": "arn:aws:vpc-lattice:us-east-1:111122223333:service/svc-abc/*"
+  }]
+}
+```
+
+Layered conditions (recommended):
+
+- `aws:SourceVpc` - require traffic from a specific VPC.
+- `aws:PrincipalTag/...` - ABAC for multi-tenant Lattice (see existing example earlier in this rule).
+- `aws:VpcSourceIp` - belt-and-suspenders source range.
+
+### SigV4 from the workload
+
+Most SDKs do this transparently - just point the HTTP client at the Lattice service URL with credentials from the default chain.
+
+```python
+# Python (boto3 + botocore SigV4 signer)
+import boto3
+import botocore.auth
+import botocore.awsrequest
+import requests
+
+session = boto3.Session()
+creds = session.get_credentials().get_frozen_credentials()
+
+req = botocore.awsrequest.AWSRequest(
+    method="POST",
+    url="https://my-svc-abc.7d67968.vpc-lattice-svcs.us-east-1.on.aws/orders",
+    data='{"customer_id": "c_123"}',
+    headers={"content-type": "application/json"},
+)
+botocore.auth.SigV4Auth(creds, "vpc-lattice-svcs", "us-east-1").add_auth(req)
+
+resp = requests.request(method=req.method, url=req.url, headers=dict(req.headers), data=req.body)
+```
+
+Go, Node, and Bash equivalents follow the same shape: load creds from the default chain, sign with `vpc-lattice-svcs` + region, send.
+
+### When to choose Lattice vs SPIFFE
+
+- **Lattice** for AWS-native workloads inside one account or organization. Fully managed; integrates with existing IAM.
+- **SPIFFE** when the platform spans clouds, runs a non-trivial Kubernetes fleet, needs attestation down to image digest, or is an ISV.
+- **Both** at the platform level - segmented by workload class. Document the boundary in an ADR. See `318-workload-identity.mdc`.
+
+### Internet machine callers
+
+VPC Lattice does not solve the case where the caller is *outside* AWS (SaaS partners, vendor automation). For that, terminate at the edge with Cloudflare Access service auth tokens (or equivalent) and forward authenticated traffic to a Lattice-fronted origin. See `400-cloudflare.mdc`.
+
+### Anti-patterns
+
+- Wildcard `Principal: *` in a Lattice auth policy "to keep moving" - never.
+- IAM identity policy without a corresponding Lattice auth policy entry, or vice versa - both layers must allow.
+- Mixing IAM auth (SigV4) callers with `AWS_IAM`-disabled (`NONE` auth) on the same Lattice service - go all-in on auth or none.
+- SigV4 with a payload-signed digest - Lattice expects `UNSIGNED-PAYLOAD`; signing the body breaks the request.
+
+---
+
 ## Identity-based vs resource-based policies (quick rules)
 
 - **Identity-based** policies generally do **not** specify `Principal` (it's implicit: the attached user/role)
