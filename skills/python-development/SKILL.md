@@ -9,6 +9,38 @@ description: Python development standards for code review and generation. Covers
 
 Apply features only when they add clarity, correctness, performance, or security. Prefer simple, intentional solutions (DRY, KISS, YAGNI, Fail Fast).
 
+## The Zen of Python (`import this`)
+
+The canonical aphorisms by Tim Peters (PEP 20). When in doubt about which Python idiom to choose, re-read these. Quote verbatim; do not paraphrase in code reviews.
+
+```text
+The Zen of Python, by Tim Peters
+
+Beautiful is better than ugly.
+Explicit is better than implicit.
+Simple is better than complex.
+Complex is better than complicated.
+Flat is better than nested.
+Sparse is better than dense.
+Readability counts.
+Special cases aren't special enough to break the rules.
+Although practicality beats purity.
+Errors should never pass silently.
+Unless explicitly silenced.
+In the face of ambiguity, refuse the temptation to guess.
+There should be one-- and preferably only one --obvious way to do it.
+Although that way may not be obvious at first unless you're Dutch.
+Now is better than never.
+Although never is often better than *right* now.
+If the implementation is hard to explain, it's a bad idea.
+If the implementation is easy to explain, it may be a good idea.
+Namespaces are one honking great idea -- let's do more of those!
+```
+
+> Run `python -c "import this"` in any Python REPL to see it.
+
+For per-line operative readings (how to apply each in review), see the Zen section in `rules/200-python.mdc`.
+
 ## AI Assistant Guidelines
 
 - **Avoid Over-Engineering**: Don't recommend boto3 client caching, async/await, or concurrency patterns unless explicitly requested or bottlenecks are evident

@@ -16,59 +16,97 @@ files:
 
 Apply features only when they add clarity, correctness, performance, or security. Prefer simple, intentional solutions (DRY, KISS, YAGNI, Fail Fast).
 
-## Pythonic Principles (The Zen of Python)
+## The Zen of Python (`import this`)
 
-**Core Philosophy:** Python's design philosophy, captured in `import this`, guides idiomatic Python:
+The canonical aphorisms by Tim Peters (PEP 20). When in doubt about which Python idiom to choose, re-read these. Quote verbatim; do not paraphrase in code reviews.
 
-- **"Beautiful is better than ugly"** - Write readable, elegant code
-- **"Simple is better than complex"** - Prefer straightforward solutions
-- **"Complex is better than complicated"** - When complexity is needed, make it clear
-- **"Readability counts"** - Code is read more often than written
-- **"There should be one obvious way to do it"** - Follow Python conventions
-- **"If the implementation is hard to explain, it's a bad idea"** - Clarity over cleverness
-- **"Errors should never pass silently"** - Handle exceptions explicitly
-- **"In the face of ambiguity, refuse the temptation to guess"** - Be explicit, not implicit
-- **"Sparse is better than dense"** - Use whitespace and clear structure
-- **"Flat is better than nested"** - Avoid deep nesting
-- **"Now is better than never"** - Ship working code, iterate
-- **"Although practicality beats purity"** - Real-world needs matter
+```text
+The Zen of Python, by Tim Peters
 
-**Applying Pythonic Principles:**
+Beautiful is better than ugly.
+Explicit is better than implicit.
+Simple is better than complex.
+Complex is better than complicated.
+Flat is better than nested.
+Sparse is better than dense.
+Readability counts.
+Special cases aren't special enough to break the rules.
+Although practicality beats purity.
+Errors should never pass silently.
+Unless explicitly silenced.
+In the face of ambiguity, refuse the temptation to guess.
+There should be one-- and preferably only one --obvious way to do it.
+Although that way may not be obvious at first unless you're Dutch.
+Now is better than never.
+Although never is often better than *right* now.
+If the implementation is hard to explain, it's a bad idea.
+If the implementation is easy to explain, it may be a good idea.
+Namespaces are one honking great idea -- let's do more of those!
+```
+
+Operative readings (how to apply each in review):
+
+- **Beautiful is better than ugly.** Refactor for clarity even when the ugly version "works".
+- **Explicit is better than implicit.** Type hints, named arguments for booleans, no magic numbers, no implicit string-to-int conversion.
+- **Simple is better than complex.** Reach for stdlib before a framework. Reach for a function before a class.
+- **Complex is better than complicated.** When complexity is intrinsic, structure it (clear names, small functions); don't tangle it.
+- **Flat is better than nested.** Early returns, guard clauses, comprehensions over nested loops where readable.
+- **Sparse is better than dense.** Whitespace and blank lines are tools. One-liners that need a comment to explain are not Pythonic.
+- **Readability counts.** Code is read more often than written. Optimize for the reader.
+- **Special cases aren't special enough to break the rules.** No "just this once" pattern violations. Refactor the rule or live with it.
+- **Although practicality beats purity.** Ship the working answer; idealize in the next PR.
+- **Errors should never pass silently.** No bare `except:`; no `try: ... except: pass`. Raise specific exceptions.
+- **Unless explicitly silenced.** When you do want to swallow, document why and catch the *specific* exception.
+- **In the face of ambiguity, refuse the temptation to guess.** Ask. Test. Read the spec. Don't ship a heuristic dressed as logic.
+- **There should be one-- and preferably only one --obvious way to do it.** Prefer `dict.get(k)` over `dict[k] if k in dict else None`. Use the canonical idiom, not the cleverest one.
+- **Although that way may not be obvious at first unless you're Dutch.** A wink at Guido. Translation: when the obvious way isn't obvious to you yet, it's because you haven't read enough Python.
+- **Now is better than never.** Ship the boring correct version; don't wait for perfection.
+- **Although never is often better than *right* now.** Don't merge under pressure. Bad code now costs more than no code now.
+- **If the implementation is hard to explain, it's a bad idea.** If reviewers can't follow it, neither will the on-call.
+- **If the implementation is easy to explain, it may be a good idea.** Easy to explain is necessary, not sufficient. Confirm it's also correct.
+- **Namespaces are one honking great idea -- let's do more of those!** Modules over flat top-level namespaces. Classes when state warrants. Avoid `from foo import *`.
+
+### Examples
 
 ```python
 # BAD: Unpythonic - dense, nested, unclear
 def process(data):
     return [x*2 for x in [y for y in data if y>0] if x*2<100]
 
-# GOOD: Pythonic - clear, readable, explicit
+# GOOD: Pythonic - flat, explicit, readable
 def process(data: list[int]) -> list[int]:
     """Process positive numbers, doubling values under 100."""
     positive = [x for x in data if x > 0]
     doubled = [x * 2 for x in positive]
     return [x for x in doubled if x < 100]
 
-# BAD: Unpythonic - implicit, error-prone
+# BAD: Unpythonic - implicit, two ways to do one thing
 def get_value(d, k):
     if k in d:
         return d[k]
     return None
 
-# GOOD: Pythonic - explicit, clear intent
+# GOOD: Pythonic - one obvious way
 def get_value(d: dict[str, int], k: str) -> int | None:
     """Get value from dictionary, returning None if missing."""
-    return d.get(k)  # One obvious way
+    return d.get(k)
 
 # BAD: Unpythonic - errors pass silently
 def divide(a, b):
-    return a / b  # Can raise ZeroDivisionError silently
+    try:
+        return a / b
+    except Exception:
+        pass
 
-# GOOD: Pythonic - errors handled explicitly
+# GOOD: Pythonic - errors handled explicitly; specific exception
 def divide(a: float, b: float) -> float:
-    """Divide a by b, raising ValueError if b is zero."""
+    """Divide a by b. Raises ValueError if b is zero."""
     if b == 0:
         raise ValueError("Division by zero")
     return a / b
 ```
+
+> Run `python -c "import this"` in any Python REPL to see the canonical text.
 
 ## 0) AI Assistant Guidelines
 
