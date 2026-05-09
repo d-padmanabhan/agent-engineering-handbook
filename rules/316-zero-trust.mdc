@@ -174,6 +174,32 @@ Cross-refs: `440-docker.mdc`, `450-kubernetes.mdc`, `160-github-actions.mdc`.
 
 Zero Trust for AI systems is not an extension of Zero Trust - it is the same principles applied to an adversary the organization has voluntarily embedded inside its own control plane. Treat the LLM, the agent harness, the RAG corpus, and every tool output as **untrusted, persuasive user input**.
 
+### 5.0 The four identity problems unique to agents
+
+Every existing identity protocol was designed for either (a) a human at a keyboard or (b) a deterministic service. Agents are neither - they make non-deterministic decisions, can spawn sub-agents, cross trust boundaries mid-task, and run at machine speed.
+
+1. **Delegation proof.** When an agent calls an API, *who* is the actor? The user who prompted it? The agent itself? The vendor that built the agent? A traditional OAuth token says "this is a token for User X" - it cannot distinguish "User X is calling directly" from "Agent Y is calling on behalf of User X." Pair OIDC + ID-JAG (XAA) for the user-via-agent path; the `act` (actor) chain in the JWT is first-class.
+2. **Scope creep via chaining.** Agent A calls Agent B calls Agent C. If each hop re-issues bearer tokens with full user scope, a compromise anywhere in the chain compromises everything. Authorization context must *narrow*, not widen, as the chain extends.
+3. **Consent at machine speed.** An agent can't sit through 50 OAuth consent screens. Push consent to the user → OAuth fatigue + blanket approvals. Push to IT → bottleneck + shadow-AI sprawl. Pre-configure trust at the IdP (XAA / ID-JAG); per-call consent is a UX dead end for agents.
+4. **Coordinated revocation.** When an agent is compromised, every downstream session it bootstrapped must die together. Salesloft Drift (Aug 2025) showed what happens when revocation isn't coordinated: three days of lateral movement across hundreds of tenants because trust domains had no shared revocation channel. Plan for short TTLs today; CAEP (Continuous Access Evaluation Profile) is the standards-track answer.
+
+### 5.0a Three architectural primitives every agentic identity solution must provide
+
+1. **Verifiable delegation** - tokens that explicitly separate user identity, agent identity, and action context. The receiving system can answer: "User Alice, via Agent Scheduler v1.2, is requesting this action." (XAA / ID-JAG addresses this.)
+2. **Operational envelopes** - cryptographic constraints bound to the token (which tools, which data, which time window) that travel with the token across trust domains. (Partially addressed by XAA scope claims; not fully solved.)
+3. **Coordinated revocation** - shared real-time risk signals between IdPs and resource apps so revocation in one domain propagates to others. (Open industry problem; CAEP is the spec to watch.)
+
+### 5.0b Agent identity taxonomy
+
+An agent has *multiple* identities; policy decisions combine them all:
+
+- **Agent software identity** - "I am Scheduler v1.2.3, built by Vendor X." → SPIFFE ID + sigstore/SLSA software-bill-of-materials attestation.
+- **Agent instance identity** - "I am this running instance of Scheduler." → SPIFFE ID with an instance path (`spiffe://prod.example.com/agent/scheduler/instance/abc`).
+- **Delegated user identity** - "I'm acting on behalf of user Alice right now." → ID-JAG (XAA) or OIDC CIBA-style grant.
+- **Session context** - "This call is part of the task Alice asked me to do at 10:47 AM." → binding claim in the token.
+
+Cross-refs: `318-workload-identity.mdc` (agent software/instance identity via SPIFFE), `317-okta.mdc` (delegated user identity via XAA/ID-JAG).
+
 ### 5.1 Tool allow-lists and capability tokens
 
 **Principle:** agents get capabilities, not credentials.

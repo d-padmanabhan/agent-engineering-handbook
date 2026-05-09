@@ -797,6 +797,51 @@ app.post('/api/fetch', async (req, res) => {
 
 ---
 
+## OWASP NHI Top 10 (2025) - Non-Human Identities
+
+OWASP's Top 10 risks for **Non-Human Identities** (service accounts, API keys, OAuth apps, SPIFFE workloads, IAM roles, bot accounts, CI/CD runners, AI agents). NHIs typically outnumber humans 45-100:1 in cloud-native enterprises - in heavily agentic environments the ratio can be 1000:1+. Traditional IAM (designed for humans) does not handle NHIs well: no HR system, no interactive consent, no MFA, often unclear ownership.
+
+> Source: [OWASP NHI Top 10 (2025)](https://owasp.org/www-project-non-human-identities-top-10/). Covered in operational depth in `316-zero-trust.mdc` (principles), `318-workload-identity.mdc` (substrates), `412-aws-iam.mdc` (AWS specifics), and `317-okta.mdc` (Okta specifics).
+
+| # | Risk | Core issue | Primary mitigation |
+|---|---|---|---|
+| **NHI1** | Improper Offboarding | Orphaned service accounts and API keys persist after the workload is retired | Lifecycle automation tied to workload registration; expire on inactivity |
+| **NHI2** | Secret Leakage | Secrets hardcoded in repos, logs, config files, chat | Secret scanning (Gitleaks / TruffleHog / GitGuardian); pre-commit hooks; centralized secrets manager (Vault, AWS SM, GCP SM) |
+| **NHI3** | Vulnerable Third-Party NHI | OAuth apps and integrations compromised upstream (Salesloft Drift pattern) | Vendor NHI inventory; OAuth scope review; ability to revoke third-party tokens globally |
+| **NHI4** | Insecure Authentication | Weak/deprecated auth (password auth for service accounts, unvalidated JWTs) | Deprecate password auth for SAs; require JWT validation with strict `aud`, `iss`, `exp`, signature |
+| **NHI5** | Overprivileged NHI | Service accounts granted `*:*` because least-privilege was too hard | IAM Access Analyzer; policy-as-code (OPA, Cedar); periodic right-sizing |
+| **NHI6** | Insecure Cloud Deployment Configurations | CI/CD with over-scoped cloud creds; unconditional OIDC federation | Scoped OIDC trust conditions on CI federation (`sub`, `repository`, `environment` claims must match) |
+| **NHI7** | Long-Lived Secrets | API keys with no expiration; certs valid for years | Ephemeral creds: SPIFFE SVIDs, AWS IAM Roles Anywhere, Azure Managed Identity, GCP Workload Identity, short-lived OAuth |
+| **NHI8** | Environment Isolation | Same NHI used in dev, staging, and prod (Imperva pattern) | Separate trust domains per env; never cross-reuse IAM roles |
+| **NHI9** | NHI Reuse | One NHI shared across multiple apps, blocking least-privilege | One NHI per workload + purpose; convention enforced in IaC review |
+| **NHI10** | Human Use of NHI | A human logs in as the service account "for convenience" | Workload attestation - only the *workload* can present the SVID; humans can't (SPIFFE solves this directly) |
+
+### Real incidents to anchor the list
+
+| Incident | NHI failure | Top 10 category |
+|---|---|---|
+| **Microsoft Midnight Blizzard** (Jan 2024) | Legacy OAuth app (unmanaged NHI) with full privileges in non-prod tenant; pivot to prod email | NHI1, NHI3, NHI8 |
+| **CircleCI** (Jan 2023) | Stolen session cookie → generated production workload credentials → persistent access | NHI2, NHI4 |
+| **Imperva Cloud WAF** (2019) | Production DB snapshot in test env exposed NHI credentials | NHI8 |
+| **Internet Archive** (Oct 2024) | Access token in GitLab repo for 22 months → 7 TB exfil + downstream Zendesk compromise | NHI2, NHI7 |
+| **Salesloft Drift** (Aug 2025) | Compromised OAuth tokens at integration vendor → parallel access to hundreds of Salesforce tenants → 3-day revocation lag | NHI3 |
+
+The Drift incident is the canonical reference for agent-era revocation gaps: federation bootstraps trust but doesn't coordinate revocation. XAA (`317-okta.mdc`) and CAEP address this; until both are widely deployed, **short TTLs are the only defense**.
+
+### Platform-engineering stance
+
+Eliminating NHIs is impossible at scale. Make NHIs:
+
+1. **Discoverable** (inventory)
+2. **Attributable** (every NHI has an owner + purpose)
+3. **Ephemeral** (short-lived by default - SPIFFE / IRSA / Workload Identity / Managed Identity)
+4. **Scoped** (least privilege by default)
+5. **Rotatable** (automatic renewal, no human in the loop)
+6. **Revocable** (kill-switch that works across trust domains)
+7. **Auditable** (every action traceable to a specific NHI and - where applicable - the human who delegated to it)
+
+---
+
 ## Secret Management
 
 ### Environment Variables

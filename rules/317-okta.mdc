@@ -350,6 +350,126 @@ Audit:
 
 ---
 
+## Cross App Access (XAA / ID-JAG)
+
+**Cross App Access (XAA)** is Okta's branded implementation of the IETF OAuth **Identity Assertion JWT Authorization Grant (ID-JAG)** standard. ID-JAG is the spec; XAA is Okta's product. Both terms are essentially interchangeable. It extends OAuth 2.0 Token Exchange (RFC 8693) to solve app-to-app and **agent-to-app** access with the IdP as the broker.
+
+Announced June 23, 2025; rolling into the Okta Platform through 2025-2026. Auth0 is adding ID-JAG support for ISVs. Initial ecosystem includes AWS, Box, Glean, Salesforce, Automation Anywhere, Boomi, Google Cloud, Grammarly, Miro, Writer.
+
+### The problem XAA solves
+
+Two existing patterns for app-to-app access, both broken at scale:
+
+1. **API keys / shared secrets.** Each app stores credentials for each other app it needs to call. Sprawl, no rotation, no centralized revocation, no user context.
+2. **User-granted OAuth.** Every user clicks consent for every app-to-app connection. Doesn't scale to agents (no UI) or enterprises (bypasses IT governance).
+
+XAA makes the **IdP the broker** - admins configure which apps can talk to which other apps; the IdP issues short-lived tokens carrying user identity *and* requesting-app/agent identity.
+
+### Three roles
+
+- **Requesting App** - the agent or app that needs to call another app's API.
+- **Resource App** - the app whose API is being called.
+- **Identity Provider (IdP)** - Okta (or any ID-JAG-compliant IdP) brokers the trust.
+
+### Protocol flow (simplified)
+
+```
+1. User logs in to Requesting App via Okta (OIDC). Requesting App
+   has an ID token + session.
+
+2. Requesting App needs Resource App's API. It sends an Identity
+   Assertion request to Okta:
+     "I am Requesting App. User X is active. I want to call
+      Resource App with scope Y."
+
+3. Okta evaluates XAA policy:
+     - Is Requesting App allowed to talk to Resource App?
+     - Is the user authorized?
+     - Which scopes are permitted?
+
+4. Okta issues an ID-JAG (signed JWT) asserting:
+     - sub = user
+     - act = Requesting App (actor chain)
+     - aud = Resource App
+     - scopes
+     - short TTL (typically 5 minutes)
+
+5. Requesting App posts the ID-JAG to Resource App's token
+   endpoint (RFC 8693 token exchange).
+
+6. Resource App validates: signature against Okta JWKS, aud is
+   itself, trust relationship configured, user has corresponding
+   account.
+
+7. Resource App issues its own access token, scoped appropriately.
+
+8. Requesting App calls Resource App API with that access token.
+   Action logged with BOTH user identity AND Requesting App as
+   actor.
+```
+
+### Why this is significant
+
+| Property | OAuth (user-granted) | Shared API keys | **XAA / ID-JAG** |
+|---|---|---|---|
+| Centralized access control | No | No | **Yes (IdP)** |
+| Works for autonomous agents | No (consent UI) | Yes (but unsafe) | **Yes** |
+| Short-lived credentials | Depends | Usually no | **Yes by design** |
+| User identity preserved in call | Yes | No | **Yes** |
+| Agent/app identity preserved | Weak | No | **Yes (first-class)** |
+| Audit trail of both user + agent | No | No | **Yes** |
+| Admin-revocable in one place | Per-app | No | **Yes** |
+| Policy on cross-app connections | No | No | **Yes** |
+
+### What XAA does NOT solve (be honest)
+
+- **Cross-organizational trust.** XAA addresses the *single trust domain* case. Cross-org agent-to-app is still an open industry problem. The OAuth Identity Chaining draft is the spec to watch.
+- **Revocation propagation.** Revoking at the IdP doesn't instantly invalidate Resource-App-issued tokens. They live until their TTL. Short TTLs are the mitigation; CAEP (Continuous Access Evaluation Profile) is the long-term answer.
+- **Agent supply chain.** XAA tells the Resource App *which* Requesting App is calling, not whether its code was compromised. Pair with sigstore / SLSA / in-toto attestation.
+- **Model-level data governance.** XAA governs *API access*. It does not prevent a misaligned agent from misusing data it legitimately fetched. That's an AI governance / DLP problem.
+
+### When to use XAA
+
+**Use XAA when:**
+
+- The organization is already on Okta
+- There are agentic apps (internal or SaaS) that need to call other SaaS apps
+- The relevant SaaS vendors are in the XAA ecosystem (Salesforce, Box, Glean, AWS, etc.)
+- Centralized policy + audit for app-to-app + agent-to-app is required
+
+**Don't rely solely on XAA when:**
+
+- Cross-organizational agent access is required (not yet solved)
+- Integrations are custom internal services (use SPIFFE + mTLS via `318-workload-identity.mdc` - XAA is for the app layer, SPIFFE is for the infrastructure layer)
+- Sub-second revocation propagation is required (XAA is TTL-based)
+
+### XAA vs MCP vs A2A
+
+- **MCP (Model Context Protocol, Anthropic)** defines *how* an agent talks to tools (the wire protocol for tool invocations).
+- **A2A (Agent2Agent, Google)** defines how agents talk to each other.
+- **XAA / ID-JAG** defines *how access is authorized* regardless of MCP, A2A, or direct API.
+
+These are complementary. MCP is the agent's tool interface, A2A is agent-to-agent orchestration, XAA enforces "which user, via which agent, can reach which app" underneath all of it.
+
+### Implementation notes
+
+- **Requesting App** typically uses the Auth0 SDK (Node, Python, Go) for token exchange. Build it from scratch only if no SDK exists.
+- **Resource App** must publish a token endpoint that accepts ID-JAG via RFC 8693 grant type `urn:ietf:params:oauth:grant-type:token-exchange`.
+- **Admin setup in Okta**: Requesting App and Resource App both pre-registered; trust relationship and scope mapping configured by IT, not the user.
+- **Conditional Access** policies still apply (device posture, network zone, MFA freshness).
+
+### Hands-on
+
+Okta runs a free no-signup playground at **`xaa.dev`** that walks the protocol in each role (Requesting App, Resource App, IdP) and includes an MCP server acting as a Resource App so the agent path is visible end-to-end. Worth 30 minutes before architectural decisions.
+
+### Auth0 add-ons
+
+- **Auth0 Token Vault** - cryptographically verified user-entity tokens and cross-domain access translation.
+- **Auth0 FGA** - ReBAC engine (Zanzibar-inspired) for fine-grained agent permissions.
+- **Auth0 for AI Agents** - SDKs specifically for adding identity-first security to AI apps.
+
+---
+
 ## Common Anti-patterns
 
 1. **Super Admin as "service account".** Use scoped roles; OAuth 2.0 for Okta.
@@ -369,7 +489,9 @@ Audit:
 
 - `315-iam.mdc` - IAM/OIDC/SAML/PKCE protocol reference
 - `316-zero-trust.mdc` - Zero Trust principles and AI-agent Zero Trust
+- `318-workload-identity.mdc` - infrastructure-layer identity (SPIFFE/SPIRE/cloud IAM); pairs with XAA at the app layer
 - `412-aws-iam.mdc` - AWS IAM (for AWS-Okta SSO integration)
 - `180-terraform.mdc` - Terraform patterns
 - `330-observability.mdc` - SIEM integration and audit logging
-- `310-security.mdc` - OWASP (for app-side auth bugs)
+- `310-security.mdc` - OWASP web + NHI Top 10 (for app-side auth bugs)
+- `510-mcp-servers.mdc` - MCP servers as Resource Apps for XAA
