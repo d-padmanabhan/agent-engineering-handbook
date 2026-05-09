@@ -58,6 +58,7 @@ Comprehensive, battle-tested Cursor IDE configuration for professional software 
 - **[310-security.mdc](rules/310-security.mdc)** - OWASP Top 10, secret management
 - **[316-zero-trust.mdc](rules/316-zero-trust.mdc)** - Distinguished Engineer - Zero Trust (identity, network, data, workload, AI/agents)
 - **[317-okta.mdc](rules/317-okta.mdc)** - Okta Workforce Identity (SSO, MFA, SCIM, policies, Workflows, ASA, terraform-provider-okta)
+- **[318-workload-identity.mdc](rules/318-workload-identity.mdc)** - Workload identity (SPIFFE/SPIRE, cloud IAM, OIDC federation)
 - **[300-testing.mdc](rules/300-testing.mdc)** - Unit/Integration/E2E testing strategies
 
 ### Patterns & Best Practices

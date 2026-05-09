@@ -50,6 +50,7 @@ Quick lookup table for all Cursor rules files in `rules/`.
 | [315-iam.mdc](315-iam.mdc) | Practical security guidance for IAM design and identity protocols (OIDC/OAuth2/PKCE, SAML/ADFS) plus PKI and PAM operational patterns. | 315 | No |
 | [316-zero-trust.mdc](316-zero-trust.mdc) | Distinguished-engineer Zero Trust: principles-first security across identity, network, data, workload, and AI/agent systems. | 316 | Yes |
 | [317-okta.mdc](317-okta.mdc) | Okta Workforce Identity: orgs, apps, users/groups, policies, lifecycle (SCIM), Workflows, Advanced Server Access, Admin API, and terraform-provider-okta. | 317 | No |
+| [318-workload-identity.mdc](318-workload-identity.mdc) | Attestation-based workload identity: SPIFFE/SPIRE/SVIDs/mTLS, cloud IAM (IRSA, GCP WI, Managed Identity, VPC Lattice), and OIDC federation bridges. | 318 | No |
 | [320-api-design.mdc](320-api-design.mdc) | REST API design patterns, GraphQL, gRPC, versioning, authentication, and API documentation standards | 320 | No |
 | [330-observability.mdc](330-observability.mdc) | Logging, metrics, tracing, alerting, and observability patterns for production systems | 330 | No |
 
@@ -103,7 +104,7 @@ Quick lookup table for all Cursor rules files in `rules/`.
 - **Core engineering**: [100-core.mdc](100-core.mdc), [130-git.mdc](130-git.mdc), [110-configuration.mdc](110-configuration.mdc)
 - **Utilities + docs**: [120-utilities.mdc](120-utilities.mdc), [800-markdown.mdc](800-markdown.mdc), [810-documentation.mdc](810-documentation.mdc), [815-reactflow-diagrams.mdc](815-reactflow-diagrams.mdc)
 - **Languages**: [140-bash.mdc](140-bash.mdc), [200-python.mdc](200-python.mdc), [210-go.mdc](210-go.mdc), [220-rust.mdc](220-rust.mdc), [230-javascript.mdc](230-javascript.mdc), [240-typescript.mdc](240-typescript.mdc)
-- **Security**: [310-security.mdc](310-security.mdc), [315-iam.mdc](315-iam.mdc), [316-zero-trust.mdc](316-zero-trust.mdc), [317-okta.mdc](317-okta.mdc), [412-aws-iam.mdc](412-aws-iam.mdc)
+- **Security**: [310-security.mdc](310-security.mdc), [315-iam.mdc](315-iam.mdc), [316-zero-trust.mdc](316-zero-trust.mdc), [317-okta.mdc](317-okta.mdc), [318-workload-identity.mdc](318-workload-identity.mdc), [412-aws-iam.mdc](412-aws-iam.mdc)
 - **Cloud + IaC**: [170-cloudformation.mdc](170-cloudformation.mdc), [180-terraform.mdc](180-terraform.mdc), [400-cloudflare.mdc](400-cloudflare.mdc), [410-aws.mdc](410-aws.mdc), [420-gcp.mdc](420-gcp.mdc), [430-azure.mdc](430-azure.mdc)
 - **Containers**: [440-docker.mdc](440-docker.mdc), [450-kubernetes.mdc](450-kubernetes.mdc), [460-helm.mdc](460-helm.mdc)
 - **Databases**: [470-postgresql.mdc](470-postgresql.mdc), [475-sql.mdc](475-sql.mdc)

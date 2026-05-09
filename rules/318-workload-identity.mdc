@@ -1,0 +1,412 @@
+---
+title: Workload Identity (SPIFFE, SPIRE, Cloud IAM Federation)
+description: Attestation-based workload identity for service-to-service auth. SPIFFE/SPIRE concepts, SVIDs, mTLS, federation, OIDC bridge to cloud IAM, and the SPIFFE-vs-cloud-IAM decision.
+priority: 318
+alwaysApply: false
+files:
+  include:
+    - "**/*spiffe*.*"
+    - "**/*spire*.*"
+    - "**/*svid*.*"
+    - "**/*workload-identity*.*"
+    - "**/*workload_identity*.*"
+    - "**/istio/**/*.yaml"
+    - "**/istio/**/*.yml"
+    - "**/*authorization-policy*.yaml"
+    - "**/*peer-authentication*.yaml"
+    - "**/*lattice*.tf"
+    - "**/*irsa*.*"
+    - "**/*pod-identity*.*"
+    - "**/*.tf"
+---
+
+# Workload Identity (SPIFFE, SPIRE, Cloud IAM Federation)
+
+**Audience:** engineers designing or operating service-to-service authentication for Kubernetes, multi-cloud, or AI-agent platforms.
+
+**Scope:** the *infrastructure* layer of identity - "is this workload allowed to call that workload?" For the *application* layer ("is this app/agent allowed to call that app on behalf of this user?") see the Okta XAA / ID-JAG section in `317-okta.mdc`.
+
+> [!IMPORTANT]
+> This rule complements:
+>
+> - `316-zero-trust.mdc` - principles (always-on)
+> - `315-iam.mdc` - protocol reference (OIDC/SAML/PKCE/PKI)
+> - `412-aws-iam.mdc` - AWS IAM specifics (IRSA, Pod Identity, VPC Lattice)
+> - `317-okta.mdc` - Okta Workforce Identity (incl. XAA)
+> - `450-kubernetes.mdc` - Kubernetes patterns (incl. service mesh)
+
+---
+
+## The single most important idea
+
+**The pivot from credential-based to attestation-based workload identity.**
+
+| | Credential-based | Attestation-based |
+|---|---|---|
+| Trust basis | "I hold this secret" | "The platform cryptographically proves what I am, every time I ask" |
+| Failure mode | Secret leaks → breach | No long-lived secret to leak |
+| Rotation | Manual or scheduled | Continuous, automated |
+| Examples | Static API key, long-lived OAuth token, baked-in cert | SPIFFE SVID, IRSA-vended STS creds, GCP Workload Identity, Azure Managed Identity |
+
+Every major lateral-movement breach of the last five years - SolarWinds, CircleCI (Jan 2023), Imperva, Okta support portal, Microsoft Midnight Blizzard, Salesloft Drift - had a workload credential at the root. The pattern is always the same: a credential outlived its purpose, was over-scoped, or was never tied to a verifiable workload identity in the first place.
+
+**Rule:** if your design includes a long-lived workload secret, you have not designed Zero Trust.
+
+---
+
+## Identity stack mental model
+
+| Layer | Who/what | Maturity | Primary primitives |
+|---|---|---|---|
+| **Human** | Employees, customers, partners | Mature | OIDC, SAML, WebAuthn/passkeys, MFA, SSO |
+| **Device** | Laptops, phones, servers | Progressing | mTLS client certs, TPM, device posture, MDM |
+| **Workload** | Services, containers, functions, **agents** | Fastest-growing, least mature | SPIFFE/SPIRE, cloud IAM (IRSA / Workload Identity / Managed Identity), OIDC workload federation |
+
+Zero Trust collapses if the workload layer still runs on shared secrets.
+
+---
+
+## SPIFFE - the standard
+
+**SPIFFE** = Secure Production Identity Framework For Everyone. CNCF specs - no code, no runtime - that define how workloads are *named* and *credentialed*. Three artifacts that matter:
+
+1. **SPIFFE ID** - the name format.
+2. **SVID** - how to encode that name in a verifiable credential (X.509 or JWT).
+3. **Workload API** - a local, unauthenticated gRPC API the workload calls to fetch its SVID.
+
+### SPIFFE ID format
+
+```
+spiffe://<trust-domain>/<workload-path>
+
+# Examples
+spiffe://prod.example.com/ns/payments/sa/checkout
+spiffe://ai.example.com/agent/scheduler/instance/abc123
+spiffe://corp.example.com/workload/ci/github-actions-runner
+```
+
+- **Trust domain** is the root of authority - tenant, environment, BU, or cloud account. Choose deliberately; hard to change later. Common pattern: one trust domain per environment (`prod`, `staging`, `dev`).
+- **Path** is operator-defined; borrow from the platform (k8s namespace + service account, cloud account + function, etc.).
+- IDs are **stable across reschedules** - they name the *logical* workload, not the pod or IP.
+
+### Workload API
+
+Local gRPC endpoint (typically `unix:///run/spire/sockets/agent.sock`) that returns:
+
+- Current X.509-SVID (cert + key)
+- Any JWT-SVIDs the workload requests
+- The trust bundle (CA roots / public keys for verifying peers)
+
+**The Workload API requires no secret to call.** The calling process is identified by the agent through OS-level introspection (UID/GID, container labels, pod metadata, image digest). The workload proves what it is *to its own node agent* via attestation, not via a bootstrap token.
+
+### Federation
+
+Two SPIFFE trust domains can **federate** by exchanging trust bundles, enabling a workload in `prod.a.com` to verify an SVID from `prod.b.com` (another org / cluster / cloud). Cross-org equivalent of OIDC federation.
+
+---
+
+## SPIRE - the reference implementation
+
+**SPIRE** = SPIFFE Runtime Environment. CNCF graduated. The control plane that issues and verifies SVIDs.
+
+### Components
+
+```mermaid
+flowchart TD
+    subgraph control [Control plane]
+        server["SPIRE Server (HA)<br/>signing CA, registration registry,<br/>node attestor plugins, datastore"]
+    end
+    subgraph node1 [Node 1]
+        agent1[SPIRE Agent]
+        wl1[Workload]
+    end
+    subgraph node2 [Node 2]
+        agent2[SPIRE Agent]
+        wl2[Workload]
+    end
+    server <-- "mTLS (agent SVID)" --> agent1
+    server <-- "mTLS (agent SVID)" --> agent2
+    agent1 -- "Workload API (UDS, no auth)" --> wl1
+    agent2 -- "Workload API (UDS, no auth)" --> wl2
+```
+
+### Two-level attestation - the core mechanism
+
+This is what makes SPIRE distinct from credential-based systems.
+
+| Level | Question | Evidence |
+|---|---|---|
+| **Node attestation** | Is this a legitimate node I should trust to run an Agent? | Cloud IID (AWS EC2 instance identity doc, GCP IIT, Azure MSI), Kubernetes PSAT, TPM, ephemeral join token, x509 PoP |
+| **Workload attestation** | Is the process calling the Workload API actually the workload it claims to be? | Linux UID/GID, `/proc` inspection, Kubernetes pod labels/namespace/SA, **container image digest**, systemd unit name |
+
+Neither level uses a pre-shared secret. Both are rooted in platform-level evidence an unauthorized process cannot forge.
+
+### Registration entries
+
+Selectors → SPIFFE ID:
+
+```bash
+spire-server entry create \
+  -parentID  spiffe://prod.example.com/node/k8s-worker-1 \
+  -spiffeID  spiffe://prod.example.com/ns/payments/sa/checkout \
+  -selector  k8s:ns:payments \
+  -selector  k8s:sa:checkout \
+  -selector  k8s:container-image:registry.example.com/checkout@sha256:abc...
+```
+
+The image-digest selector is a strong primitive for supply-chain-aware identity - it defeats image-tag drift.
+
+### Deployment topologies
+
+- **Single-cluster** - one SPIRE Server, agents as a DaemonSet. Default for most Kubernetes deployments.
+- **Nested SPIRE** - root server with downstream servers as intermediate CAs. Useful for multi-cluster with local autonomy under a single trust domain.
+- **Federated** - multiple independent trust domains exchanging bundles. Multi-org or strict environment isolation.
+- **HA** - multiple Servers behind an LB, sharing a SQL datastore (Postgres/MySQL) and an upstream CA (Vault PKI, AWS Private CA, Google CAS, cert-manager).
+
+### Upstream authorities
+
+In production, almost always use an `UpstreamAuthority` plugin so SPIRE Server is an intermediate CA, not the root. Keeps the real root offline/HSM-protected and integrates with existing PKI.
+
+---
+
+## SVIDs - the credentials
+
+| | **X.509-SVID** | **JWT-SVID** |
+|---|---|---|
+| Wire format | X.509 certificate | Signed JWT |
+| SPIFFE ID location | `URI` SAN (not CN) | `sub` claim |
+| Best for | mTLS (L4, east-west) | L7 APIs, HTTP Authorization headers, cloud OIDC federation |
+| Replay-safe? | Yes (tied to TLS handshake + private key) | No (bearer - use short TTL + audience) |
+| Typical TTL | 1 hour | minutes |
+
+**Rule of thumb:** use X.509-SVIDs wherever TLS termination is possible. Fall back to JWT-SVIDs when sitting behind an L7 load balancer, calling a REST API that only understands bearer tokens, or federating to cloud IAM via OIDC.
+
+### Automatic rotation
+
+SPIRE Agent watches SVID expiry and renews proactively (default: 50% of TTL). SDKs (`go-spiffe`, `java-spiffe`) receive new credentials over streaming gRPC - no restart. This is what makes 1-hour certificates operationally viable, and 1-hour certificates are what shrink the leak blast radius.
+
+---
+
+## mTLS - the transport
+
+mTLS = TLS where **both** sides present certificates. The default transport for attestation-based workload identity.
+
+### Enforcement models
+
+| Model | How | Pros | Cons |
+|---|---|---|---|
+| **Sidecar proxy** (Envoy, Istio) | Proxy terminates mTLS; app speaks plaintext to localhost | Language-agnostic, centralized policy | Per-pod proxy overhead |
+| **Library-embedded** (`go-spiffe`, gRPC `XdsCredentials`) | App does mTLS via SDK | No proxy tax, lowest latency | Per-language effort |
+| **Node-level / ambient** (Cilium, Istio Ambient) | Kernel/eBPF interception | No sidecar per pod | Newer, fewer features |
+| **Managed service mesh** (VPC Lattice, GCP Cloud Run IAM) | Cloud terminates + authorizes at the edge | Zero ops | Cloud-locked, no SPIFFE |
+
+A mature platform mixes these. mTLS proves *who the peer is*; **authorization is still required** - typically Istio AuthorizationPolicy matching `source.principal`, or Envoy + OPA forwarding the SPIFFE ID to a Rego policy.
+
+### SLOs to watch at scale
+
+- **Issuance** - % of workloads with a valid SVID within N seconds of start (target: 99.99% within 5s).
+- **Renewal** - no workload runs within T hours of expiration without renewal (target: renew at 50% TTL).
+- **Handshake success** - error budget by service and path.
+- **Coverage** - % of east-west calls using verified mTLS (target: 100%, get there incrementally).
+
+---
+
+## Cloud IAM as workload identity (the pragmatic alternative)
+
+Not every platform runs SPIRE. Workloads that live entirely inside one cloud can use the cloud's IAM as their workload-identity substrate. Same Zero Trust outcome, very different ops profile.
+
+### Equivalents per cloud
+
+| Cloud | Pattern |
+|---|---|
+| **AWS** | IRSA / Pod Identity / Lambda execution role / ECS task role; **VPC Lattice + `AWS_IAM` auth + SigV4** for service-to-service |
+| **GCP** | Workload Identity (GKE), service-account tokens, Cloud Run with IAM auth, Internal HTTP(S) LB with IAP |
+| **Azure** | Managed Identity (system or user-assigned), API Management with managed-identity auth, Private Link Service with identity-aware access |
+
+The shape is identical: cloud attests the workload via metadata service / platform integration, issues a short-lived credential, and enforces authorization at a managed PEP.
+
+### AWS-native: VPC Lattice + `AWS_IAM` + SigV4
+
+For machine-to-service HTTP calls inside AWS, this is the Zero Trust default before reaching for SPIRE.
+
+Enforcement layers (all must pass):
+
+1. **IAM identity policy** on the caller: grants `vpc-lattice-svcs:Invoke` on the target service ARN.
+2. **VPC Lattice auth policy** on the service or service network: explicitly permits the caller principal.
+3. **SigV4 signature** with `vpc-lattice-svcs` as the signing name (payload unsigned - Lattice doesn't support payload signing).
+4. **Network path** via VPC association - no internet exposure needed.
+
+See `412-aws-iam.mdc` for the worked Terraform example.
+
+---
+
+## SPIFFE vs Cloud IAM - the decision
+
+The cloud-native primitives are **substitutes** for SPIFFE inside one cloud, not complements. Pick one per workload (and use the application-layer primitive on top).
+
+| Dimension | SPIFFE + mTLS | Cloud IAM (AWS Lattice / GCP / Azure) |
+|---|---|---|
+| Identity source | Attestation of workload properties | Cloud-managed principal |
+| Portability | Multi-cloud, on-prem, edge | Single cloud |
+| Ops burden | High (run SPIRE HA, CA, observability) | Fully managed |
+| Cross-cloud / hybrid | Native (trust-domain federation) | External glue (OIDC fed) |
+| Policy language | OPA / Istio AuthZ / custom | IAM auth policies (JSON) |
+| Workload attestation granularity | Down to image digest | Down to IAM role (not the binary) |
+| Good fit for | Multi-cloud platforms, ISVs, k8s-first | Cloud-native single-cloud, IAM-deep teams |
+
+**When to choose which:**
+
+- **Choose SPIFFE** when the platform spans clouds, runs a non-trivial Kubernetes fleet, needs attestation down to image digest, or is an ISV that must be portable.
+- **Choose cloud IAM** when workloads are cloud-native and single-cloud, the team already operates IAM at depth, and running SPIRE is not desirable.
+- **Use both** in most real enterprises: SPIFFE for k8s east-west, cloud IAM for workloads that don't need the portability overhead.
+
+---
+
+## OIDC bridge to cloud IAM
+
+JWT-SVIDs + the SPIRE OIDC Discovery Provider let a workload trade a SPIFFE identity for cloud creds with no static cloud key.
+
+```mermaid
+flowchart LR
+    wl[Workload] -->|"Workload API"| api[SPIRE Workload API]
+    api -->|"JWT-SVID"| oidc["SPIRE OIDC Discovery Provider<br/>(.well-known/openid-configuration)"]
+    oidc -->|"AssumeRoleWithWebIdentity"| sts[AWS STS]
+    oidc -->|"Workload Identity Federation"| gcpfed[GCP STS]
+    oidc -->|"Federated credentials"| azfed[Azure AD]
+    oidc -->|"JWT auth method"| vault[HashiCorp Vault]
+    sts --> awscreds[Temp AWS creds]
+    gcpfed --> gcpcreds[GCP access token]
+    azfed --> azcreds[Azure AD token]
+    vault --> vtok[Vault token]
+```
+
+This collapses "how do I give my pods cloud access" from "distribute IAM keys" to "trust my SPIFFE trust domain as an OIDC issuer."
+
+---
+
+## End-to-end example: agentic workload across infra + app layers
+
+An agent in a Kubernetes cluster needs to call Salesforce on behalf of user Alice.
+
+```
+1. Pod starts. SPIRE Agent attests the pod (k8s selectors:
+   namespace, SA, image digest) and issues an X.509-SVID:
+     spiffe://prod.example.com/agent/scheduler/instance/abc
+
+2. Agent calls its local LLM gateway (another in-cluster service)
+   over mTLS, presenting its SVID. Gateway OPA verifies the SPIFFE
+   ID is in the allow-list.
+
+3. Alice invokes the agent. The agent has Alice's session context
+   via an OIDC ID token from Okta.
+
+4. Agent decides it needs to update a Salesforce opportunity. It
+   calls Okta's token-exchange endpoint, presenting:
+     - Alice's ID token (user context)
+     - The agent's SPIFFE JWT-SVID (workload identity)
+     - Request: ID-JAG for Salesforce, scope=opportunity:write
+
+5. Okta's XAA policy evaluates and issues an ID-JAG (short-lived JWT).
+
+6. Agent posts the ID-JAG to Salesforce's OAuth token endpoint
+   (RFC 8693 token exchange).
+
+7. Salesforce validates against Okta JWKS, confirms aud, issues a
+   scoped Salesforce access token for Alice.
+
+8. Agent calls Salesforce API. Action logged with BOTH Alice's
+   identity AND the Scheduler agent instance as actor.
+
+9. TTL expires in 15 minutes. Cycle repeats - revocations and
+   policy changes propagate within one TTL.
+```
+
+Every hop is identity-bound. Nothing is a static secret. Every action is attributable to both the agent and the user. See `317-okta.mdc` (XAA section) for the application-layer detail.
+
+---
+
+## Quick reference cheat sheet
+
+| Designing... | Start with... |
+|---|---|
+| Service-to-service auth in Kubernetes | SPIFFE + SPIRE + mTLS (Istio/Envoy SDS) |
+| Eliminating static cloud IAM keys for workloads | JWT-SVID + cloud OIDC federation |
+| Agent calling internal services | SPIFFE SVID for the agent pod |
+| AWS workload calling AWS workload | VPC Lattice + `AWS_IAM` + SigV4 |
+| GCP workload calling GCP workload | Workload Identity + Cloud Run/Endpoints with IAM |
+| Azure workload calling Azure workload | Managed Identity + APIM/Private Link |
+| Multi-cloud service identity | SPIFFE federation |
+| Single-cloud platform with strong IAM culture | Cloud-native (Lattice / IAM) + XAA at app layer |
+| Multi-cloud or k8s-heavy platform | SPIFFE for infra + XAA at app layer |
+| Agent calling SaaS on user's behalf | XAA / ID-JAG via Okta (see `317-okta.mdc`) |
+| Cross-org agent access | Not yet standardized; interim per-tenant OAuth apps with short TTL |
+| Internet machine callers into AWS | Cloudflare Access service auth tokens at the edge |
+
+---
+
+## Anti-patterns
+
+1. **EC2 instance profile as workload identity for high-density shared compute.** Any process on the instance that reaches IMDSv2 can request the role's credentials. Identity is bound to the instance, not the workload. Use IRSA / Pod Identity / SPIRE for finer grain.
+2. **One trust domain across environments.** A `dev` workload then has SVID-cousin status with prod. Separate trust domains per environment.
+3. **Long-lived JWT-SVIDs.** Defeats the rotation property. Keep TTL in minutes; let the SDK auto-refresh.
+4. **mTLS without authorization.** mTLS proves *who*, not *what*. Pair with Istio AuthorizationPolicy / OPA / Envoy ext_authz / Lattice auth policy.
+5. **Identity in the cert CN.** SPIFFE ID belongs in the URI SAN. CN is empty or ignored.
+6. **Distributing trust bundles by hand.** Workloads fetch via Workload API; rotation is automatic.
+7. **Mixing SPIFFE and cloud IAM as if they were complements inside one cloud.** Pick one per workload. Use both at the *platform* level (different workloads use different substrates).
+8. **No upstream authority.** Self-signed SPIRE root is fine for dev; in prod, integrate with Vault / AWS Private CA / Google CAS / cert-manager.
+9. **Image-tag selectors instead of digest selectors.** Tags drift; digests don't. Use the digest in registration entries.
+10. **Treating revocation as "TTL is fine".** TTL is the *floor*; for sub-second revocation, plan for CAEP or short TTLs + active session-kill.
+
+---
+
+## Reviewer Checklist
+
+Identity model:
+
+- [ ] Choice between SPIFFE and cloud IAM is documented with rationale (multi-cloud? attestation granularity? ops capacity?)
+- [ ] Trust domain(s) chosen per environment; not shared across envs
+- [ ] No long-lived workload secrets introduced
+
+SPIFFE / SPIRE:
+
+- [ ] SPIRE Server in HA with SQL datastore
+- [ ] Upstream Authority configured (Vault PKI / AWS PCA / Google CAS / cert-manager)
+- [ ] Node attestor uses cloud IID / k8s PSAT (not bare join tokens in prod)
+- [ ] Workload attestor includes container image digest where available
+- [ ] X.509-SVID TTL ≤ 1h; renewal at ≤ 50% TTL
+- [ ] JWT-SVID TTL in minutes; audience required
+- [ ] Federation bundles documented if cross-trust-domain
+- [ ] mTLS coverage SLO defined and tracked
+
+Cloud IAM (when used):
+
+- [ ] Workload identity (IRSA / Pod Identity / GCP WI / Managed Identity), not static keys
+- [ ] OIDC federation for CI (no long-lived deploy keys)
+- [ ] AWS service-to-service via VPC Lattice + `AWS_IAM` + SigV4 where applicable
+- [ ] Lattice resource policy explicitly names allowed callers (no wildcards)
+
+Authorization on top of mTLS:
+
+- [ ] Istio AuthorizationPolicy / OPA / Envoy ext_authz applied
+- [ ] Default-deny posture; explicit allow lists per service
+- [ ] SPIFFE ID extracted from URI SAN, not CN
+
+Audit:
+
+- [ ] SPIRE Server audit log streamed to SIEM
+- [ ] mTLS handshake failures alerted
+- [ ] Registration changes (entry create/update/delete) audited
+
+---
+
+## See also
+
+- `316-zero-trust.mdc` - principles (always-on)
+- `315-iam.mdc` - protocol reference
+- `317-okta.mdc` - Okta + XAA / ID-JAG (application layer)
+- `412-aws-iam.mdc` - AWS IAM, IRSA, VPC Lattice
+- `410-aws.mdc` - AWS Zero Trust networking
+- `420-gcp.mdc`, `430-azure.mdc` - cloud equivalents
+- `450-kubernetes.mdc` - service mesh patterns
+- `500-ai-ml.mdc`, `510-mcp-servers.mdc` - AI / MCP layer
+- `330-observability.mdc` - audit
