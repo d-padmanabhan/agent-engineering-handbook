@@ -797,6 +797,12 @@ app.post('/api/fetch', async (req, res) => {
 
 ---
 
+## End-to-end audit playbook
+
+For a full audit (not just a rule lookup), use the `codebase-security-audit` skill - it covers the eight practical scanning layers (secrets, SAST, SCA, taint, CPG, IaC, custom rules, DAST), per-OWASP-category ripgrep playbooks, severity matrix, and a complete reference `.github/workflows/security.yml`. This rule covers the *what* and *why*; the skill covers *how to run the audit and wire it into CI*.
+
+---
+
 ## OWASP NHI Top 10 (2025) - Non-Human Identities
 
 OWASP's Top 10 risks for **Non-Human Identities** (service accounts, API keys, OAuth apps, SPIFFE workloads, IAM roles, bot accounts, CI/CD runners, AI agents). NHIs typically outnumber humans 45-100:1 in cloud-native enterprises - in heavily agentic environments the ratio can be 1000:1+. Traditional IAM (designed for humans) does not handle NHIs well: no HR system, no interactive consent, no MFA, often unclear ownership.
