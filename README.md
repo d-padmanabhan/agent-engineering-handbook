@@ -469,3 +469,54 @@ Based on Cursor's docs:
   - **Where they live**: `.cursor/skills/` (project) or `~/.cursor/skills/` (user). Cursor also discovers `.claude/skills/` and `.codex/skills/` for compatibility
   - **How they apply**: the agent can auto-select a relevant skill, or you can invoke it manually via `/skill-name`. You can force "manual only" by setting `disable-model-invocation: true`
   - **Best for**: repeatable multi-step playbooks (release, deploy, migration, audit, generating artifacts) and "do X end-to-end" flows
+
+## Skills shipped in this repo
+
+Skills under `skills/` cover repeatable end-to-end workflows that pair with the rules above. Cursor auto-selects them based on the SKILL.md `description:` triggers; invoke manually as `/<skill-name>` when needed.
+
+### Engineering & code
+
+- **[skills/agent-workflow](skills/agent-workflow/)** - Plan/Implement/Review workflow + audit
+- **[skills/core-engineering](skills/core-engineering/)** - core engineering principles, code review
+- **[skills/python-development](skills/python-development/)** - Python 3.14+ patterns
+- **[skills/typescript-javascript](skills/typescript-javascript/)** - TS/JS patterns
+- **[skills/go-rust-systems](skills/go-rust-systems/)** - Go and Rust systems programming
+- **[skills/bash-shell-scripting](skills/bash-shell-scripting/)** - production Bash scripts
+- **[skills/scripting-automation](skills/scripting-automation/)** - advanced Bash automation
+
+### Security & identity
+
+- **[skills/security-testing](skills/security-testing/)** - OWASP Top 10 + testing strategies (overview)
+- **[skills/codebase-security-audit](skills/codebase-security-audit/)** - 8-layer audit (secrets / SAST / SCA / taint / CPG / IaC / custom / DAST) + reference CI workflow
+- **[skills/zero-trust](skills/zero-trust/)** - Distinguished-engineer Zero Trust playbook
+- **[skills/aws-iam](skills/aws-iam/)** - AWS IAM operational patterns
+- **[skills/okta](skills/okta/)** - Okta Workforce Identity playbook
+- **[skills/workload-identity](skills/workload-identity/)** - SPIFFE/SPIRE/cloud IAM/OIDC federation
+
+### Cloud, data & infrastructure
+
+- **[skills/cloud-platforms](skills/cloud-platforms/)** - AWS / Azure / GCP / Cloudflare patterns
+- **[skills/infrastructure-iac](skills/infrastructure-iac/)** - Terraform / Docker / Ansible / CloudFormation
+- **[skills/containers-orchestration](skills/containers-orchestration/)** - Docker patterns
+- **[skills/kubernetes-containers](skills/kubernetes-containers/)** - Kubernetes / Helm
+- **[skills/database-postgresql](skills/database-postgresql/)** - PostgreSQL patterns
+- **[skills/data-engineering](skills/data-engineering/)** - data pipelines, contracts, quality
+- **[skills/snowflake](skills/snowflake/)** - Snowflake operational playbook
+- **[skills/databricks](skills/databricks/)** - Databricks operational playbook
+- **[skills/cicd-github-actions](skills/cicd-github-actions/)** - GitHub Actions patterns
+
+### AI, MCP & analysis
+
+- **[skills/mcp-development](skills/mcp-development/)** - building MCP servers
+- **[skills/web-research-kb-refresh](skills/web-research-kb-refresh/)** - bounded web-research KB refresh with atomic swap (general pattern)
+- **[skills/multi-perspective-review](skills/multi-perspective-review/)** - weighted multi-advisor decision review with industry-precedent pairs
+
+### Documentation & artifacts
+
+- **[skills/documentation-standards](skills/documentation-standards/)** - Markdown + Mermaid + ADR patterns
+- **[skills/reactflow-architecture-diagrams](skills/reactflow-architecture-diagrams/)** - interactive React Flow architecture canvases
+- **[skills/single-file-dashboard](skills/single-file-dashboard/)** - zero-dependency single-file HTML dashboards (emailable / airgap-safe)
+
+### Workflow patterns (meta)
+
+- **[skills/skills-composition](skills/skills-composition/)** - patterns for chaining skills, scope resolution, graceful degradation
