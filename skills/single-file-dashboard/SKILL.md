@@ -22,7 +22,7 @@ Use when the user asks for:
 - "Build a dashboard" / "interactive HTML report" / "shareable analysis"
 - "Offline dashboard" / "airgap-safe" / "for the client" / "for the regulator"
 - "Visualize this workbook" / "turn this CSV into a presentable view"
-- A McKinsey-style executive deliverable
+- An executive-style deliverable for client / leadership / regulator review
 - Anything that must render without internet access
 
 Do *not* use for:
@@ -113,7 +113,7 @@ The build script is the source of truth. The HTML is the artifact.
 
 ---
 
-## Design system (McKinsey-style executive palette)
+## Design system (executive palette)
 
 A consistent design system makes outputs presentable without manual adjustment.
 
@@ -347,7 +347,7 @@ The script writes a single string to disk. Test it by opening the output in a br
 4. **Charting library** (D3, Chart.js, ECharts, Plotly). Each adds 100-500KB and requires either a bundler or a CDN. Vanilla SVG is enough for executive charts.
 5. **Generated HTML edited in place.** Make changes in the generator and re-run; otherwise the artifact and the source diverge.
 6. **No HTML escaping.** A user-supplied product name with `<script>` in it becomes XSS in the dashboard.
-7. **Donut / 3D / sunburst charts.** Hard to read; not McKinsey style. Use bar charts.
+7. **Donut / 3D / sunburst charts.** Hard to read at executive density. Use bar charts.
 8. **More than 3 charts in a single section.** Cognitive load over signal.
 9. **Localizing into the HTML** ("English en", "French fr") - use one language per output; multiple outputs for multiple languages.
 
@@ -388,4 +388,4 @@ The script writes a single string to disk. Test it by opening the output in a br
 
 ## Attribution
 
-Pattern crystallized from a McKinsey-style consolidation dashboard generator that produces single-file HTML output (no CDN, no fonts, no images, inline vanilla SVG) sized at <2 MB and renders identically in Chrome, Outlook, and on an airgapped laptop. The single-file/zero-dependency guarantee is the feature.
+Pattern crystallized from an executive-style consolidation dashboard generator that produces single-file HTML output (no CDN, no fonts, no images, inline vanilla SVG) sized at <2 MB and renders identically in Chrome, Outlook, and on an airgapped laptop. The single-file/zero-dependency guarantee is the feature.

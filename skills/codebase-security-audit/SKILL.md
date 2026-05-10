@@ -349,7 +349,7 @@ Examples to author for any non-trivial repo:
 
 1. **Internal auth decorator missing** - every handler in `routes/` must have `@require_auth(scope=...)` or `@public_endpoint`.
 2. **PII fields without redaction** - any logger call with a known PII field name (`email`, `ssn`, `phone`, `dob`, `card_number`) must wrap it in `redact()`.
-3. **Internal SDK misuse** - internal HTTP client `mck_http.get()` must always pass `timeout=` and `verify=True`.
+3. **Internal SDK misuse** - internal HTTP client `acme_http.get()` must always pass `timeout=` and `verify=True`.
 4. **Forbidden imports** - block `import requests` in modules that should use the internal client; block `import pickle` in services that accept external input.
 5. **Tenant-scope check** - every DB query in a multi-tenant service must include a `tenant_id` filter.
 

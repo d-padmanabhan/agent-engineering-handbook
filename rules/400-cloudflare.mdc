@@ -75,7 +75,7 @@ Cloudflare offers three identity surfaces in front of an origin. Use each for wh
 
 | Layer | What it answers | Identity source |
 |---|---|---|
-| **Cloudflare Access** | "Should this request reach the origin at all?" | IdP (Okta, McKinsey ID, etc.) for users; service auth tokens or mTLS for machines |
+| **Cloudflare Access** | "Should this request reach the origin at all?" | IdP (Okta, Entra ID, Google Workspace, etc.) for users; service auth tokens or mTLS for machines |
 | **Authenticated Origin Pulls (AOP)** | "Did this request actually come from Cloudflare?" | mTLS cert from Cloudflare to the origin |
 | **Worker JWT validation** | "Does this specific API call have the right scope/audience/tenant?" | The same Access JWT (`Cf-Access-Jwt-Assertion`) or a separate token |
 | **Origin JWT validation** | "Same as above, but enforced at the origin" | Same |

@@ -59,24 +59,24 @@ rules:
 
 ## Internal SDK misuse
 
-The internal HTTP client `mck_http.get()` must always pass `timeout=` and `verify=True`.
+The internal HTTP client `acme_http.get()` must always pass `timeout=` and `verify=True`.
 
 ```yaml
 # .semgrep/internal-http-client-misuse.yaml
 rules:
   - id: internal-http-missing-timeout
-    message: mck_http.$METHOD called without timeout
+    message: acme_http.$METHOD called without timeout
     severity: ERROR
     languages: [python]
     patterns:
-      - pattern: mck_http.$METHOD(...)
-      - pattern-not: mck_http.$METHOD(..., timeout=$T, ...)
+      - pattern: acme_http.$METHOD(...)
+      - pattern-not: acme_http.$METHOD(..., timeout=$T, ...)
 
   - id: internal-http-verify-disabled
-    message: mck_http.$METHOD called with verify=False
+    message: acme_http.$METHOD called with verify=False
     severity: ERROR
     languages: [python]
-    pattern: mck_http.$METHOD(..., verify=False, ...)
+    pattern: acme_http.$METHOD(..., verify=False, ...)
 ```
 
 ---
@@ -89,7 +89,7 @@ Block `import requests` in modules that should use the internal client; block `i
 # .semgrep/forbidden-imports.yaml
 rules:
   - id: prefer-internal-http-client
-    message: Use mck_http instead of requests
+    message: Use acme_http instead of requests
     severity: ERROR
     languages: [python]
     paths:
