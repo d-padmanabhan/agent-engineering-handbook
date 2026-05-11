@@ -83,7 +83,7 @@ MIT - See LICENSE.
 ### Headers
 - Use `#` hierarchy (don't skip levels)
 - Keep headers concise
-- Use sentence case
+- Use title case for headings, preserving established acronyms and product names
 
 ### Code Blocks
 ````markdown
