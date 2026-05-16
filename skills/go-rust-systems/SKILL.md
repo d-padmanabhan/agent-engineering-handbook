@@ -205,6 +205,72 @@ fn process_user(id: &str) -> anyhow::Result<User> {
 }
 ```
 
+## Go Logging - Default Stack
+
+**Default for new code:** `log/slog` (stdlib since 1.21) with the JSON handler. The ecosystem has aligned behind slog as the frontend; backends can be swapped without touching log statements if profiling shows logging is a bottleneck.
+
+```go
+opts := &slog.HandlerOptions{AddSource: true, Level: slog.LevelInfo}
+slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, opts)))
+```
+
+### Calling conventions, ordered by safety
+
+```go
+slog.Info("request", "method", "GET", "status", 200)                    // loose - error-prone
+slog.InfoContext(ctx, "request", slog.String("method", "GET"), ...)     // recommended (enables trace correlation)
+logger.LogAttrs(ctx, slog.LevelInfo, "request", slog.String(...), ...)  // safest (typed; compile-time)
+```
+
+### Trace correlation via `otelslog`
+
+```go
+import "go.opentelemetry.io/contrib/bridges/otelslog"
+
+slog.SetDefault(otelslog.NewLogger("svc", otelslog.WithLoggerProvider(global.GetLoggerProvider())))
+// MUST use *Context variants for span correlation:
+logger.InfoContext(ctx, "processing", slog.String("order_id", id))
+```
+
+### Redaction via `LogValuer`
+
+```go
+type APIKey string
+func (APIKey) LogValue() slog.Value { return slog.StringValue("REDACTED") }
+```
+
+Centralizes redaction so call sites cannot leak by accident.
+
+### Decision matrix - when to swap backend
+
+| Need | Choice | Notes |
+|---|---|---|
+| Default | `slog` + `JSONHandler` | ~101 ns/op, zero allocs; fast enough for almost everyone |
+| OTel correlation | `slog` + `otelslog` bridge | Default if service runs on OpenTelemetry |
+| Profiler shows logging is hot | `phuslu/log` as slog backend | ~38 ns/op (~2.7x stdlib); single maintainer is the trade-off |
+| Maximum throughput, library API OK | `zerolog` native | ~25 ns/op, zero allocs; built-in sampling |
+| Extensibility, advanced cores, test observers | `zap` native | `zapcore.Core` composition, `zaptest/observer`, `AtomicLevel` |
+| CLI / TUI, human reads terminal | `charmbracelet/log` as slog backend | Coloring, icons, color downsampling |
+| Existing logrus | Migrate hot paths to slog | Don't start new code on logrus (maintenance mode, ~15x slower than slog) |
+
+**Footguns:**
+
+- `zerolog` *as* slog backend re-encodes `WithAttrs` per `Handle()` call - ~46x slower than its native API. Use zerolog natively; don't bridge.
+- `zerolog` chain without terminal `.Msg()` / `.Send()` silently drops the entry AND leaks the pooled `Event`.
+- `zap.SugaredLogger` adds 1 alloc per call from variadic boxing.
+- `slog` ships no TRACE / FATAL levels by default.
+
+### Required CI lint
+
+```bash
+go install github.com/go-simpler/sloglint/cmd/sloglint@latest
+sloglint -no-mixed-args -static-msg ./...
+```
+
+For the full rationale, library landscape, and benchmark numbers, see Section 7 (Logging) in `rules/210-go.mdc`.
+
+---
+
 ## Detailed References
 
 - **Go Patterns**: See [references/go-patterns.md](references/go-patterns.md) for concurrency, interfaces, testing

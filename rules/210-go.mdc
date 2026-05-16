@@ -1435,6 +1435,7 @@ staticcheck ./...
 golangci-lint run
 go test -race ./...
 govulncheck ./...
+sloglint -no-mixed-args -static-msg ./...   # see Section 7 - Logging
 ```
 
 ### CI Gates (Hardening Extension - Recommended)
@@ -1624,7 +1625,142 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 
 ---
 
-## 7. Troubleshooting Guide
+## 7. Logging
+
+**Default:** application code uses `log/slog` (stdlib since Go 1.21). Initialize with the JSON handler; pass `*slog.Logger` via dependency injection (no globals after `slog.SetDefault()` in `main`).
+
+```go
+opts := &slog.HandlerOptions{
+    AddSource: true,
+    Level:     slog.LevelInfo,
+}
+logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
+slog.SetDefault(logger)
+```
+
+This gives structured JSON, source attribution, runtime level control via `slog.LevelVar` (goroutine-safe), and zero external dependencies.
+
+### Three calling conventions, ordered by safety
+
+```go
+// 1) Loosely typed key-value (convenient, ERROR-PRONE)
+//    Odd argument count, mistyped key, or swapped key/value compile cleanly
+//    and produce silently malformed output at runtime.
+slog.Info("request", "method", "GET", "status", 200)
+
+// 2) Context-accepting (RECOMMENDED default in handlers/services)
+//    Required for trace correlation via the otelslog bridge.
+slog.InfoContext(ctx, "request",
+    slog.String("method", "GET"),
+    slog.Int("status", 200),
+)
+
+// 3) Typed attributes only (SAFEST; catches type errors at compile time)
+logger.LogAttrs(ctx, slog.LevelInfo, "request",
+    slog.String("method", "GET"),
+    slog.Int("status", 200),
+)
+```
+
+Use `LogAttrs` in hot paths and anywhere correctness matters; loose key-value form is acceptable in scripts and tests where the calls are easy to eyeball. Always run `sloglint` (see CI Gates) so the loose form does not silently rot in long-running services.
+
+### Trace correlation via `otelslog`
+
+Use the `go.opentelemetry.io/contrib/bridges/otelslog` handler to route slog through the OpenTelemetry Logs SDK. Logs become first-class OTel signals that carry the active span's trace/span IDs, enabling automatic log <-> trace correlation in your backend.
+
+```go
+import (
+    "go.opentelemetry.io/contrib/bridges/otelslog"
+    "go.opentelemetry.io/otel/log/global"
+)
+
+logger := otelslog.NewLogger(
+    "service-name",
+    otelslog.WithLoggerProvider(global.GetLoggerProvider()),
+)
+slog.SetDefault(logger)
+```
+
+Trace correlation only fires when the call accepts a context with an active span. Use `*Context` variants:
+
+```go
+// Correlated (context carries the span):
+logger.InfoContext(ctx, "processing order", slog.String("order_id", id))
+
+// NOT correlated (no context, no span):
+logger.Info("processing order", slog.String("order_id", id))
+```
+
+### Redaction via `LogValuer`
+
+Implement `slog.LogValuer` on sensitive types so they cannot leak by accident. Centralized redaction beats relying on every call site to remember.
+
+```go
+type APIKey string
+
+func (APIKey) LogValue() slog.Value { return slog.StringValue("REDACTED") }
+```
+
+Same pattern for emails, JWT tokens, PII fields, and PCI numbers - one method per type, one source of truth for the redacted form.
+
+### When to swap the slog backend (only with evidence)
+
+Default is `slog.NewJSONHandler` and it is fast enough for the vast majority of services (~101 ns/op, zero allocs in steady state). Only swap when profiling shows logging as a bottleneck. Decision matrix:
+
+| Need | Choice |
+|---|---|
+| OpenTelemetry trace correlation | slog + `otelslog` bridge (default for new services running on OTel) |
+| Profiler shows logging is a hot path; want to keep slog API | `phuslu/log` as slog backend (~38 ns/op, ~2.7x stdlib) or `zap` adapter (~70 ns/op) |
+| Maximum throughput; willing to use library API | `zerolog` native API (~25 ns/op, zero allocs); pleasant chained API; built-in sampling for high-throughput log dedup |
+| Extensibility, advanced cores, test observers | `zap` native (`zapcore.Core` composition, `zaptest/observer`, `AtomicLevel`); ~51 ns/op typed, ~82 ns/op sugared |
+| CLI tool, human reads the terminal | `charmbracelet/log` as slog backend (intelligent coloring, icons, color-downsampling for SSH/file pipes) |
+| Existing logrus codebase | Migrate hot paths to slog; leave the rest until you get to it. **Do not start new code on logrus** - in maintenance mode, ~15x slower than slog, ~50x slower than zerolog |
+
+**Footguns to remember:**
+
+- `zerolog` natively is fast, but its `slog.Handler` bridge re-encodes `WithAttrs` on every `Handle()` call - ~46x slower than its native API. If you want zerolog speed, use its native API; do not run zerolog *as* a slog backend.
+- `zerolog` API: forgetting `.Msg()` / `.Send()` at the end of a chain silently drops the entry AND leaks a pooled `Event` object. Use `sloglint` analogue or code review.
+- `zap.SugaredLogger` adds one allocation per call from the variadic `interface{}` boxing - small but compounds under load.
+- `slog` does not include `TRACE` or `FATAL` levels by default. Define your own (`slog.Level(-8)` for trace) or accept the standard set.
+
+### Library landscape (one-liner per option)
+
+| Library | Stars | When |
+|---|---|---|
+| **`log/slog`** (stdlib) | n/a | Default for new code. Frontend the ecosystem aligned on. |
+| **`zerolog`** (~12k) | ~25 ns/op native, zero allocs | Maximum throughput when you can use the library API directly. |
+| **`zap`** (~24k) | ~51 ns/op typed | Production tooling: AtomicLevel, zapcore composition, zaptest/observer. |
+| **`phuslu/log`** (~840) | ~25 ns/op native, ~38 ns/op as slog backend | Fastest available; small community + single maintainer is the trade-off. No OTel bridge yet. |
+| **`logrus`** (~25k) | ~9 us/op | Maintenance mode; do not start new code on it. |
+| **`charmbracelet/log`** (Charm TUI) | ~16 us/op | CLI / TUI tooling where humans read the output. Implements `slog.Handler`. |
+
+### Required CI lint
+
+Add `sloglint` to the CI gate so the loosely-typed key-value form cannot silently produce malformed log entries.
+
+```bash
+go install github.com/go-simpler/sloglint/cmd/sloglint@latest
+sloglint -kv-only -no-mixed-args ./...    # enforce typed attrs in hot paths
+```
+
+Reasonable defaults:
+
+- `-no-mixed-args` - reject mixing `slog.Attr` and key-value in the same call
+- `-kv-only` or `-attr-only` - pick a house style and enforce it
+- `-static-msg` - reject computed message strings (the message is the search key in observability tools)
+
+### Practical defaults summary
+
+- **Always-on:** `log/slog` + JSON handler + `otelslog` bridge if the service runs on OpenTelemetry; pass `*slog.Logger` via DI.
+- **Always-on:** `LogAttrs(ctx, ...)` for hot paths and any sensitive-data path; loose key-value only in scripts and tests.
+- **Always-on:** `LogValuer` on every sensitive type.
+- **Always-on:** `sloglint` in CI.
+- **Conditionally:** swap to `phuslu/log` or `zap` backend only when profiling shows logging is the bottleneck.
+- **Never:** start new code on logrus; bridge zerolog *into* slog (use zerolog natively if you want its speed).
+
+---
+
+## 8. Troubleshooting Guide
 
 ### Debug Logging
 
@@ -1886,7 +2022,7 @@ func (c *Cache) Set(key string, obj *LargeObject) {
 
 ---
 
-## 8. CI/CD Integration
+## 9. CI/CD Integration
 
 ### GitHub Actions Example
 
@@ -1920,7 +2056,7 @@ jobs:
 
 ---
 
-## 9. Advanced Patterns
+## 10. Advanced Patterns
 
 ### Fan-Out, Fan-In
 
@@ -2000,7 +2136,7 @@ func (rl *RateLimiter) Wait(ctx context.Context) error {
 
 ---
 
-## 10. AWS & Cloud Integration
+## 11. AWS & Cloud Integration
 
 ### AWS SDK for Go (v2)
 
@@ -2185,7 +2321,7 @@ func ValidateRegion(region string) error {
 }
 ```
 
-## 11. CLI Development
+## 12. CLI Development
 
 ### Using cobra (Recommended)
 
@@ -2352,7 +2488,7 @@ func outputResult(result interface{}, format string) error {
 }
 ```
 
-## 12. Design Patterns (Expanded)
+## 13. Design Patterns (Expanded)
 
 ### Factory Pattern
 
@@ -2501,7 +2637,7 @@ func (eb *EventBus) Publish(ctx context.Context, event Event, data interface{}) 
 }
 ```
 
-## 13. Generics (Expanded Coverage)
+## 14. Generics (Expanded Coverage)
 
 ### Generic Functions
 
@@ -2620,7 +2756,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 }
 ```
 
-## 14. Deployment & Distribution
+## 15. Deployment & Distribution
 
 ### Building Binaries
 
@@ -2755,7 +2891,7 @@ func printVersion() {
 }
 ```
 
-## 15. Documentation
+## 16. Documentation
 
 - **Package Docs**: Capture purpose in `doc.go`
 - **Exported Items**: Every exported item gets a comment
@@ -2787,7 +2923,7 @@ func GetUser(ctx context.Context, id string) (*User, error) {
 
 ---
 
-## 16. Comprehensive Example Application
+## 17. Comprehensive Example Application
 
 Complete example demonstrating idiomatic Go patterns:
 
