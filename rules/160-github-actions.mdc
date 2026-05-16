@@ -186,6 +186,50 @@ gh api repos/actions/upload-artifact/releases/latest --jq '.tag_name | split("."
 
 - Use `@main` only for experiments
 
+**For AI Agents Editing or Reviewing Existing Workflows:**
+
+Before changing logic in any workflow file, **audit every `uses:` reference in that file** for staleness. The agent should not silently leave a stale pin behind in the same edit it is making for unrelated reasons.
+
+For each pinned major version `@vN` you encounter:
+
+```bash
+# Get the latest major version of the action
+gh api repos/<owner>/<repo>/releases/latest --jq '.tag_name | split(".")[0]'
+```
+
+Then:
+
+1. **Latest major > pinned major** -> bump in this PR. Use a separate commit with a clear message: `deps(actions): bump <owner>/<repo> v3 -> v4`. Read the action's CHANGELOG / release notes for the new major to confirm no breaking change affects this workflow.
+2. **Latest major == pinned major** -> leave it alone. Dependabot covers minor/patch.
+3. **Action is archived / repo 404 / no releases** -> flag it in the PR description and propose a maintained replacement. Do **not** silently downgrade or remove.
+4. **`@main` / `@master` / `@latest` / unpinned** -> always replace with the current major-version pin (a floating tag is a supply-chain risk).
+5. **SHA-pinned actions** (`@<40-char-sha>`) -> verify the SHA still matches a tagged release; if upgrading, replace with the SHA of the new release tag, not the major. Repos that pin by SHA do so deliberately - keep that posture.
+6. **Frozen pins** -> a `# FROZEN:` / `# do-not-bump` comment immediately above the `uses:` line, OR a CHANGELOG entry referring to the pin, signals the version is deliberate. Skip and note in the PR.
+
+**Audit one workflow file in one shot:**
+
+```bash
+# Extract every uses: line, dedupe, and check each for newer major
+WORKFLOW=.github/workflows/ci.yml
+grep -oE 'uses:\s*[^@]+@v[0-9]+' "$WORKFLOW" \
+  | awk '{print $2}' \
+  | sort -u \
+  | while read ref; do
+      action="${ref%@*}"
+      pinned_major="${ref##*@}"
+      latest=$(gh api "repos/$action/releases/latest" --jq '.tag_name | split(".")[0]' 2>/dev/null)
+      if [[ -z "$latest" ]]; then
+        printf "%-50s pinned=%s  latest=ARCHIVED-OR-MISSING\n" "$action" "$pinned_major"
+      elif [[ "$latest" != "$pinned_major" ]]; then
+        printf "%-50s pinned=%s  latest=%s  *** BUMP ***\n" "$action" "$pinned_major" "$latest"
+      else
+        printf "%-50s pinned=%s  latest=%s  ok\n" "$action" "$pinned_major" "$latest"
+      fi
+    done
+```
+
+Pin upgrades that turn out to break should be reverted as a single commit, not left half-applied.
+
 - Review [https://docs.github.com/en/actions](https://docs.github.com/en/actions) and adopt relevant best practices
 
 - **Documentation**: include purpose, inputs, outputs in comments and repo docs
