@@ -98,7 +98,7 @@ docs/upgrade-guide-3-8
 
 ## Commit signing
 
-**Strict default (repos using dp-cursor-engineering-rules):** commits must be cryptographically signed (SSH, GPG, or S/MIME per Git/GitHub), unless `CONTRIBUTING.md` documents an approved exception.
+**Strict default (repos using agent-engineering-handbook):** commits must be cryptographically signed (SSH, GPG, or S/MIME per Git/GitHub), unless `CONTRIBUTING.md` documents an approved exception.
 
 - Prefer **repo-local** `git config` for `commit.gpgsign`, signing key, and `tag.gpgsign` for releases
 - Verify with `git log -1 --show-signature`; enable **Require signed commits** on protected branches when policy allows

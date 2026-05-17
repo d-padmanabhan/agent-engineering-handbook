@@ -16,18 +16,18 @@ Agent-neutral: works with Cursor, Claude Code, and Codex.
 Clone once, symlink the artifacts you want into each project:
 
 ```bash
-git clone https://github.com/d-padmanabhan/cursor-engineering-rules.git ~/cursor-engineering-rules
+git clone https://github.com/d-padmanabhan/agent-engineering-handbook.git ~/agent-engineering-handbook
 
 cd /path/to/your/project
 mkdir -p .cursor
-ln -s ~/cursor-engineering-rules/rules    .cursor/rules
-ln -s ~/cursor-engineering-rules/skills   .cursor/skills
-ln -s ~/cursor-engineering-rules/commands .cursor/commands
+ln -s ~/agent-engineering-handbook/rules    .cursor/rules
+ln -s ~/agent-engineering-handbook/skills   .cursor/skills
+ln -s ~/agent-engineering-handbook/commands .cursor/commands
 
 # Claude Code / Codex compatibility (optional - skills only)
 mkdir -p .claude .codex
-ln -s ~/cursor-engineering-rules/skills .claude/skills
-ln -s ~/cursor-engineering-rules/skills .codex/skills
+ln -s ~/agent-engineering-handbook/skills .claude/skills
+ln -s ~/agent-engineering-handbook/skills .codex/skills
 ```
 
 ## Quick-start (team)
@@ -35,7 +35,7 @@ ln -s ~/cursor-engineering-rules/skills .codex/skills
 Submodule for version pinning so every collaborator gets the same revision:
 
 ```bash
-git submodule add https://github.com/d-padmanabhan/cursor-engineering-rules.git .cursor-rules
+git submodule add https://github.com/d-padmanabhan/agent-engineering-handbook.git .cursor-rules
 mkdir -p .cursor
 ln -s ../.cursor-rules/rules    .cursor/rules
 ln -s ../.cursor-rules/skills   .cursor/skills
@@ -47,7 +47,7 @@ To bump the pinned revision:
 ```bash
 cd .cursor-rules && git pull origin main && cd ..
 git add .cursor-rules
-git commit -m "chore: bump cursor-engineering-rules"
+git commit -m "chore: bump agent-engineering-handbook"
 ```
 
 ## Setup script (rules + context only)
@@ -56,13 +56,13 @@ Shortcut for the rules-and-context part of the setup. Skills, commands, MCP, and
 
 ```bash
 cd /path/to/your/project
-/path/to/cursor-engineering-rules/setup-workspace.sh -S -l .
+/path/to/agent-engineering-handbook/setup-workspace.sh -S -l .
 ```
 
 Or for many repos at once (one per subdirectory under the parent):
 
 ```bash
-/path/to/cursor-engineering-rules/setup-all-repos.sh -S -l ~/parent-workspace
+/path/to/agent-engineering-handbook/setup-all-repos.sh -S -l ~/parent-workspace
 ```
 
 Flags:

@@ -82,10 +82,10 @@ The scripts are ready to use from this repository:
 
 ```bash
 # Run directly
-/path/to/cursor-engineering-rules/scripts/cursor-maintenance.sh
+/path/to/agent-engineering-handbook/scripts/cursor-maintenance.sh
 
 # Or add to PATH
-export PATH="$PATH:/path/to/cursor-engineering-rules/scripts"
+export PATH="$PATH:/path/to/agent-engineering-handbook/scripts"
 cursor-maintenance.sh
 ```
 

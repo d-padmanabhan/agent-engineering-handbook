@@ -1,6 +1,6 @@
-# How to Use Cursor Engineering Rules
+# How to Use Agent Engineering Handbook
 
-This guide explains how to integrate Cursor Engineering Rules into your projects.
+This guide explains how to integrate Agent Engineering Handbook into your projects.
 
 ---
 
@@ -98,7 +98,7 @@ rules:
 If you keep this repo as a shared checkout (or as a submodule), you can run:
 
 ```bash
-/path/to/cursor-engineering-rules/setup-workspace.sh -S -l .
+/path/to/agent-engineering-handbook/setup-workspace.sh -S -l .
 ```
 
 ### Method 1: Symlink (Recommended for Multiple Projects)
@@ -113,13 +113,13 @@ If you keep this repo as a shared checkout (or as a submodule), you can run:
 
 ```bash
 # Clone the repository
-git clone https://github.com/d-padmanabhan/cursor-engineering-rules.git
+git clone https://github.com/d-padmanabhan/agent-engineering-handbook.git
 cd /path/to/your/workspace
 
 # From your project
 cd /path/to/your/project
 mkdir -p .cursor
-ln -s /absolute/path/to/cursor-engineering-rules/rules .cursor/rules
+ln -s /absolute/path/to/agent-engineering-handbook/rules .cursor/rules
 
 # Verify
 ls -la .cursor/rules
@@ -147,15 +147,15 @@ cd /path/to/your/project
 mkdir -p .cursor/rules
 
 # Copy all rules
-cp /path/to/cursor-engineering-rules/rules/*.mdc .cursor/rules/
+cp /path/to/agent-engineering-handbook/rules/*.mdc .cursor/rules/
 
 # Or copy specific rules
-cp /path/to/cursor-engineering-rules/rules/200-python.mdc .cursor/rules/
-cp /path/to/cursor-engineering-rules/rules/410-aws.mdc .cursor/rules/
+cp /path/to/agent-engineering-handbook/rules/200-python.mdc .cursor/rules/
+cp /path/to/agent-engineering-handbook/rules/410-aws.mdc .cursor/rules/
 
 # (Optional) Copy workflow templates (tasks, active-context, etc.)
 mkdir -p .cursor/rules/templates
-cp /path/to/cursor-engineering-rules/rules/templates/*.template .cursor/rules/templates/
+cp /path/to/agent-engineering-handbook/rules/templates/*.template .cursor/rules/templates/
 ```
 
 Rules with `alwaysApply: true` load automatically.
@@ -186,7 +186,7 @@ rules:
 cd /path/to/your/project
 
 # Add as submodule
-git submodule add https://github.com/d-padmanabhan/cursor-engineering-rules.git .cursor-rules
+git submodule add https://github.com/d-padmanabhan/agent-engineering-handbook.git .cursor-rules
 
 # Symlink to .cursor/rules
 mkdir -p .cursor
@@ -645,7 +645,7 @@ EOF
 #### Recommended Directory Structure
 
 ```
-~/.cursor/rules/              <- Global (symlink to cursor-engineering-rules)
+~/.cursor/rules/              <- Global (symlink to agent-engineering-handbook)
   ├── 100-core.mdc            <- alwaysApply: true (all repos)
   ├── 200-python.mdc          <- loads when *.py opened
   ├── 210-go.mdc              <- loads when *.go opened
@@ -689,7 +689,7 @@ For team projects:
    ```markdown
    ## Development Setup
    
-   This project uses Cursor Engineering Rules:
+   This project uses Agent Engineering Handbook:
    1. Clone with submodules: `git clone --recurse-submodules <url>`
    2. Rules are automatically loaded from `.cursor/rules`
    3. See `.cursorrules` for configuration
@@ -708,7 +708,7 @@ For team projects:
 
 ```bash
 # Setup (symlink method)
-ln -s /path/to/cursor-engineering-rules/rules .cursor/rules
+ln -s /path/to/agent-engineering-handbook/rules .cursor/rules
 
 # Update rules (git submodule)
 git submodule update --remote .cursor-rules
@@ -735,4 +735,4 @@ cat .cursorrules
 
 ---
 
-**Need Help?** Open an issue on [GitHub](https://github.com/d-padmanabhan/cursor-engineering-rules/issues)
+**Need Help?** Open an issue on [GitHub](https://github.com/d-padmanabhan/agent-engineering-handbook/issues)

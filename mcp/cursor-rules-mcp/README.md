@@ -1,6 +1,6 @@
-# Cursor Engineering Rules MCP Server
+# Agent Engineering Handbook MCP Server
 
-**Model Context Protocol (MCP) server for Cursor Engineering Rules** - Production-grade AI agent rules for 15+ languages, multi-cloud infrastructure, and DevOps.
+**Model Context Protocol (MCP) server for Agent Engineering Handbook** - Production-grade AI agent rules for 15+ languages, multi-cloud infrastructure, and DevOps.
 
 ## Features
 
@@ -42,10 +42,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "cursor-engineering-rules": {
+    "agent-engineering-handbook": {
       "command": "cursor-rules-mcp",
       "env": {
-        "CURSOR_RULES_PATH": "/path/to/cursor-engineering-rules/rules"
+        "CURSOR_RULES_PATH": "/path/to/agent-engineering-handbook/rules"
       }
     }
   }
@@ -59,10 +59,10 @@ Add to `.cursor/mcp.json`:
 ```json
 {
   "servers": {
-    "cursor-engineering-rules": {
+    "agent-engineering-handbook": {
       "command": "cursor-rules-mcp",
       "env": {
-        "CURSOR_RULES_PATH": "/path/to/cursor-engineering-rules/rules"
+        "CURSOR_RULES_PATH": "/path/to/agent-engineering-handbook/rules"
       }
     }
   }
@@ -268,7 +268,7 @@ mcp/cursor-rules-mcp/
 
 ## Comparison with AI Developer Guide
 
-| Feature | AI Developer Guide | Cursor Engineering Rules |
+| Feature | AI Developer Guide | Agent Engineering Handbook |
 |---------|-------------------|--------------------------|
 | **Focus** | Workflow philosophy | Production standards |
 | **Languages** | 3 (Python, Go, Shell) | 15+ |
@@ -277,11 +277,11 @@ mcp/cursor-rules-mcp/
 | **Security** | Basic | OWASP, IAM, secrets, compliance |
 | **Best For** | Startups, teaching | Enterprise, production systems |
 
-**Cursor Engineering Rules v2** combines both: workflow philosophy from AI Developer Guide + comprehensive production standards.
+**Agent Engineering Handbook v2** combines both: workflow philosophy from AI Developer Guide + comprehensive production standards.
 
 ## Resources
 
-- [Cursor Engineering Rules Repository](https://github.com/d-padmanabhan/cursor-engineering-rules)
+- [Agent Engineering Handbook Repository](https://github.com/d-padmanabhan/agent-engineering-handbook)
 - [MCP Specification](https://spec.modelcontextprotocol.io/)
 - [MCP Registry](https://github.com/modelcontextprotocol/registry)
 - [MCP SDK](https://github.com/modelcontextprotocol/sdk)

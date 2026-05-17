@@ -157,7 +157,7 @@ Create the commit message file:
 - Directory: `tmp/commit_messages` (create if missing)
 - Filename format:
   - `YYYYMMDD_HHMMSS_<repo>_<branch>_<last7sha>.md`
-  - Example: `20251228_154700_cursor-engineering-rules_main_abcd123.md`
+  - Example: `20251228_154700_agent-engineering-handbook_main_abcd123.md`
 
 Notes:
 

@@ -1,4 +1,4 @@
-# Cursor Engineering Rules
+# Agent Engineering Handbook
 
 > **Production-grade rules, skills, commands, and MCP server for AI coding agents - language, cloud, security, and AI/ML standards for 15+ stacks**
 
@@ -9,7 +9,7 @@ Comprehensive, battle-tested configuration for AI coding agents. Curated **rules
 > [!NOTE]
 > **Agent-neutral.** Originally built for Cursor; today the content ships in formats compatible with **Cursor**, **Claude Code**, and **Codex** - rules (`.cursor/rules/`, `AGENTS.md`), Agent Skills (`.cursor/skills/`, `.claude/skills/`, `.codex/skills/`), and slash commands. The MCP server works with any MCP-compatible client.
 >
-> The repo name still says "cursor-engineering-rules" for historical reasons; rename pending.
+> **Renamed in May 2026** from `cursor-engineering-rules` to `agent-engineering-handbook` to reflect what the repo became (rules + skills + commands + MCP server + hooks for any AI coding agent, not just Cursor). GitHub redirects old URLs, so existing clones, submodules, and bookmarks keep working.
 
 ---
 
@@ -132,10 +132,10 @@ Workflow commands for explicit phase transitions. Type `/command` in your agent'
 
 ```bash
 # Copy to your project
-cp -r /path/to/cursor-engineering-rules/commands .cursor/commands
+cp -r /path/to/agent-engineering-handbook/commands .cursor/commands
 
 # Or symlink
-ln -s /path/to/cursor-engineering-rules/commands .cursor/commands
+ln -s /path/to/agent-engineering-handbook/commands .cursor/commands
 ```
 
 **Workflow:**
@@ -165,7 +165,7 @@ npm link
 # Add to ~/Library/Application Support/Claude/claude_desktop_config.json:
 {
   "mcpServers": {
-    "cursor-engineering-rules": {
+    "agent-engineering-handbook": {
       "command": "cursor-rules-mcp"
     }
   }
@@ -196,11 +196,11 @@ Rules with `alwaysApply: true` in their frontmatter load automatically when plac
 ```bash
 # Symlink to your home directory (applies to all projects)
 mkdir -p ~/.cursor
-ln -s /path/to/cursor-engineering-rules/rules ~/.cursor/rules
+ln -s /path/to/agent-engineering-handbook/rules ~/.cursor/rules
 
 # Or symlink per-project
 mkdir -p .cursor
-ln -s /path/to/cursor-engineering-rules/rules .cursor/rules
+ln -s /path/to/agent-engineering-handbook/rules .cursor/rules
 ```
 
 **Rules that auto-load (`alwaysApply: true`):**
@@ -261,12 +261,12 @@ Copy specific rules to your project:
 mkdir -p .cursor/rules
 
 # Copy specific rules you need
-cp path/to/cursor-engineering-rules/rules/200-python.mdc .cursor/rules/
-cp path/to/cursor-engineering-rules/rules/410-aws.mdc .cursor/rules/
+cp path/to/agent-engineering-handbook/rules/200-python.mdc .cursor/rules/
+cp path/to/agent-engineering-handbook/rules/410-aws.mdc .cursor/rules/
 
 # (Optional) Copy workflow templates (tasks, active-context, etc.)
 mkdir -p .cursor/rules/templates
-cp path/to/cursor-engineering-rules/rules/templates/*.template .cursor/rules/templates/
+cp path/to/agent-engineering-handbook/rules/templates/*.template .cursor/rules/templates/
 ```
 
 ### Option 1.5: Use Setup Scripts (Convenience)
@@ -274,7 +274,7 @@ cp path/to/cursor-engineering-rules/rules/templates/*.template .cursor/rules/tem
 If you keep a shared checkout of this repo, you can bootstrap a workspace with:
 
 ```bash
-/path/to/cursor-engineering-rules/setup-workspace.sh -S -l .
+/path/to/agent-engineering-handbook/setup-workspace.sh -S -l .
 ```
 
 Add to your `.cursorrules` file:
@@ -291,7 +291,7 @@ Symlink the entire rules directory:
 
 ```bash
 # From your project root
-ln -s /absolute/path/to/cursor-engineering-rules/rules .cursor/rules
+ln -s /absolute/path/to/agent-engineering-handbook/rules .cursor/rules
 ```
 
 Configure `.cursorrules`:

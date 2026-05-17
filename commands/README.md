@@ -8,13 +8,13 @@ Copy the `commands/` folder to your project's `.cursor/` directory:
 
 ```bash
 # From your project root
-cp -r /path/to/cursor-engineering-rules/commands .cursor/commands
+cp -r /path/to/agent-engineering-handbook/commands .cursor/commands
 ```
 
 Or symlink:
 
 ```bash
-ln -s /path/to/cursor-engineering-rules/commands .cursor/commands
+ln -s /path/to/agent-engineering-handbook/commands .cursor/commands
 ```
 
 ## Available Commands

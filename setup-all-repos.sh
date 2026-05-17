@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Batch setup Cursor Engineering Rules for all git repos under a parent directory.
+# Batch setup Agent Engineering Handbook for all git repos under a parent directory.
 #
 # Usage:
 #   ./setup-all-repos.sh [OPTIONS] [parent-workspace]

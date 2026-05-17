@@ -22,7 +22,7 @@ From your repo root:
 
 ```bash
 mkdir -p .cursor/hooks
-cp -R /path/to/dp-cursor-engineering-rules/hooks/cursor/*.py .cursor/hooks/
-cp /path/to/dp-cursor-engineering-rules/hooks/cursor/hooks.project.example.json .cursor/hooks.json
+cp -R /path/to/agent-engineering-handbook/hooks/cursor/*.py .cursor/hooks/
+cp /path/to/agent-engineering-handbook/hooks/cursor/hooks.project.example.json .cursor/hooks.json
 chmod +x .cursor/hooks/*.py
 ```

@@ -12,7 +12,7 @@ export class CursorRulesMcpServer {
   private apiClient: ApiClient;
 
   constructor(baseUrl?: string) {
-    this.log(`Initializing Cursor Engineering Rules MCP Server with baseUrl: ${baseUrl || 'default'}`);
+    this.log(`Initializing Agent Engineering Handbook MCP Server with baseUrl: ${baseUrl || 'default'}`);
 
     this.server = new Server(
       {
@@ -143,7 +143,7 @@ export class CursorRulesMcpServer {
               return acc;
             }, {} as Record<string, typeof rules>);
 
-            let text = '# Cursor Engineering Rules\n\n';
+            let text = '# Agent Engineering Handbook\n\n';
             text += 'Production-grade AI agent rules for 15+ languages, multi-cloud infrastructure, and DevOps.\n\n';
             text += '**Total Rules:** ' + rules.length + '\n\n';
             text += '---\n\n';
@@ -190,7 +190,7 @@ export class CursorRulesMcpServer {
 
   async start() {
     const transport = new StdioServerTransport();
-    this.log('Cursor Engineering Rules MCP Server starting on stdio transport...');
+    this.log('Agent Engineering Handbook MCP Server starting on stdio transport...');
     await this.server.connect(transport);
     this.log('Server connected and ready for requests');
   }

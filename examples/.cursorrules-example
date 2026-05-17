@@ -27,7 +27,7 @@ rulesDirectory: .cursor/rules
 
 # This will load all .mdc files from the rules directory
 # Ensure you've symlinked or copied the rules:
-#   ln -s /path/to/cursor-engineering-rules/rules .cursor/rules
+#   ln -s /path/to/agent-engineering-handbook/rules .cursor/rules
 
 # ═══════════════════════════════════════════════════════════════
 # OPTION 2: Selective Rules (For specific technology stacks)

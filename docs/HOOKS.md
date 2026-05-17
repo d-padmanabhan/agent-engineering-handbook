@@ -61,8 +61,8 @@ Copy the example config and scripts into your repo:
 
 ```bash
 mkdir -p .cursor/hooks
-cp -R /path/to/dp-cursor-engineering-rules/hooks/cursor/*.py .cursor/hooks/
-cp /path/to/dp-cursor-engineering-rules/hooks/cursor/hooks.project.example.json .cursor/hooks.json
+cp -R /path/to/agent-engineering-handbook/hooks/cursor/*.py .cursor/hooks/
+cp /path/to/agent-engineering-handbook/hooks/cursor/hooks.project.example.json .cursor/hooks.json
 chmod +x .cursor/hooks/*.py
 ```
 
@@ -71,7 +71,7 @@ chmod +x .cursor/hooks/*.py
 Only after you like the behavior in a few repos, install globally:
 
 ```bash
-/path/to/dp-cursor-engineering-rules/scripts/cursor-hooks-install.sh --user
+/path/to/agent-engineering-handbook/scripts/cursor-hooks-install.sh --user
 ```
 
 ## Notes and safety

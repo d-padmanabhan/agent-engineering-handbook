@@ -1,4 +1,4 @@
-# Contributing to Cursor Engineering Rules
+# Contributing to Agent Engineering Handbook
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to this project.
 
@@ -151,7 +151,7 @@ refactor(go): reorganize concurrency section
 ## Project Structure
 
 ```
-cursor-engineering-rules/
+agent-engineering-handbook/
  rules/              # All .mdc rule files
     010-workflow.mdc
     100-core.mdc
@@ -335,6 +335,6 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-**Thank you for contributing to Cursor Engineering Rules!**
+**Thank you for contributing to Agent Engineering Handbook!**
 
 Your contributions help developers worldwide write better, more maintainable code.

@@ -1,7 +1,7 @@
 {
   "name": "cursor-engineering-rules-mcp",
   "version": "1.0.0",
-  "description": "MCP server for Cursor Engineering Rules - production-grade AI agent rules for 15+ languages",
+  "description": "MCP server for Agent Engineering Handbook - production-grade AI agent rules for 15+ languages",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

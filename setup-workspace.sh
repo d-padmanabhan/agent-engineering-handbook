@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Setup Cursor Engineering Rules in a workspace.
+# Setup Agent Engineering Handbook in a workspace.
 #
 # Supports the recommended model:
 # - Workspace uses a symlink: <workspace>/.cursor/rules -> <this-repo>/rules

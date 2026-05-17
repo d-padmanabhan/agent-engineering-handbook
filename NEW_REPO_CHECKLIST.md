@@ -11,7 +11,7 @@ Wire this repo's rules, skills, slash commands, MCP server, hooks, and workspace
 > **Fast path** (if you keep this repo as a shared checkout):
 >
 > ```bash
-> /path/to/cursor-engineering-rules/setup-workspace.sh -S -l .
+> /path/to/agent-engineering-handbook/setup-workspace.sh -S -l .
 > ```
 >
 > `-S` symlinks `rules/`, `-l` writes only `tmp/tasks.md`. Use `-f` for the full context-file set. The rest of this checklist documents what the script does **and the extras (skills, commands, MCP, hooks) it does not yet automate**.
@@ -34,10 +34,10 @@ Rules (`.mdc`) load globally (`alwaysApply: true`) or by file-glob match.
 ```bash
 # Symlink (personal, one repo)
 mkdir -p .cursor
-ln -s /path/to/cursor-engineering-rules/rules .cursor/rules
+ln -s /path/to/agent-engineering-handbook/rules .cursor/rules
 
 # Submodule (team, pinned)
-git submodule add https://github.com/d-padmanabhan/cursor-engineering-rules.git .cursor-rules
+git submodule add https://github.com/d-padmanabhan/agent-engineering-handbook.git .cursor-rules
 mkdir -p .cursor
 ln -s ../.cursor-rules/rules .cursor/rules
 
@@ -54,15 +54,15 @@ Skills are multi-step playbooks: test plans, deployment runbooks, security audit
 
 ```bash
 # Cursor
-ln -s /path/to/cursor-engineering-rules/skills .cursor/skills
+ln -s /path/to/agent-engineering-handbook/skills .cursor/skills
 
 # Claude Code
 mkdir -p .claude
-ln -s /path/to/cursor-engineering-rules/skills .claude/skills
+ln -s /path/to/agent-engineering-handbook/skills .claude/skills
 
 # Codex
 mkdir -p .codex
-ln -s /path/to/cursor-engineering-rules/skills .codex/skills
+ln -s /path/to/agent-engineering-handbook/skills .codex/skills
 ```
 
 Mix per project. See the **Skills shipped in this repo** section in the parent [README.md](README.md) for the catalog.
@@ -74,10 +74,10 @@ Slash commands provide explicit workflow phase transitions (`/plan`, `/build`, `
 ```bash
 # Copy (no upstream updates)
 mkdir -p .cursor/commands
-cp -r /path/to/cursor-engineering-rules/commands/* .cursor/commands/
+cp -r /path/to/agent-engineering-handbook/commands/* .cursor/commands/
 
 # Symlink (live updates)
-ln -s /path/to/cursor-engineering-rules/commands .cursor/commands
+ln -s /path/to/agent-engineering-handbook/commands .cursor/commands
 ```
 
 Type `/<command>` in your agent's chat to trigger. See [commands/README.md](commands/README.md) for the full catalog (~19 commands).
@@ -87,7 +87,7 @@ Type `/<command>` in your agent's chat to trigger. See [commands/README.md](comm
 Install if you want **on-demand rule loading** via tool calls instead of pre-loading every `.mdc`. Useful when context budget matters.
 
 ```bash
-cd /path/to/cursor-engineering-rules/mcp/cursor-rules-mcp
+cd /path/to/agent-engineering-handbook/mcp/cursor-rules-mcp
 npm install
 npm run build
 npm link        # optional: makes `cursor-rules-mcp` globally invokable
@@ -100,7 +100,7 @@ Then configure your agent. See [mcp/cursor-rules-mcp/INSTALLATION.md](mcp/cursor
 Deterministic guardrails (block reading `.env`, gate destructive shell commands) and audit logging via Cursor's hooks API.
 
 ```bash
-/path/to/cursor-engineering-rules/scripts/cursor-hooks-install.sh
+/path/to/agent-engineering-handbook/scripts/cursor-hooks-install.sh
 ```
 
 See [docs/HOOKS.md](docs/HOOKS.md) for what each hook does, how to disable individual checks, and how to write your own. **Cursor-specific** today; the hooks API is not yet portable across agents.
@@ -151,8 +151,8 @@ Mirror this repo's pre-commit stack so your consumer repo gets the same lint + s
 brew install pre-commit                                  # macOS
 # pip install pre-commit                                 # any platform
 
-cp /path/to/cursor-engineering-rules/.pre-commit-config.yaml .pre-commit-config.yaml
-cp /path/to/cursor-engineering-rules/.markdownlint.yaml   .markdownlint.yaml
+cp /path/to/agent-engineering-handbook/.pre-commit-config.yaml .pre-commit-config.yaml
+cp /path/to/agent-engineering-handbook/.markdownlint.yaml   .markdownlint.yaml
 pre-commit install
 pre-commit run --all-files                               # baseline run
 ```
