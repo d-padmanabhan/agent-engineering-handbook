@@ -28,7 +28,7 @@ readlink .cursor/rules
 - [ ] Create `tmp/tasks.md` (minimum)
 
 ```bash
-mkdir -p tmp
+mkdir -p tmp/pr tmp/pr_reviews tmp/agent_reports tmp/bug_reports
 cp .cursor/rules/templates/tasks.md.template tmp/tasks.md
 ```
 
@@ -46,9 +46,14 @@ cp .cursor/rules/templates/progress.md.template tmp/progress.md
 
 ## Git hygiene (recommended)
 
-- [ ] Ensure `tmp/` is ignored (add to your repo’s `.gitignore`):
+- [ ] **Git Hygiene:** Add the following to `.git/info/exclude` (preferred) instead of the repo `.gitignore`: `**/tmp/`, `.terraform/`, `.terragrunt-cache/`. Do not modify the repo `.gitignore` for these entries.
 
-```gitignore
-# Private/local documentation
-tmp/
+```bash
+cat >> .git/info/exclude <<'EOF'
+**/tmp/
+.terraform/
+.terragrunt-cache/
+EOF
 ```
+
+Rationale: these are personal / per-clone workspaces and tool caches, not project-wide policy. `.git/info/exclude` keeps them out of *your* working tree without imposing the convention on every collaborator via the committed `.gitignore`.
