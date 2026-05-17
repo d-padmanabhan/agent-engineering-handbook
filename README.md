@@ -1,13 +1,15 @@
 # Cursor Engineering Rules
 
-> **Production-grade Cursor rules, skills, commands, and MCP server for 15+ languages and cloud platforms**
+> **Production-grade rules, skills, commands, and MCP server for AI coding agents - language, cloud, security, and AI/ML standards for 15+ stacks**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Comprehensive, battle-tested Cursor IDE configuration for professional software engineering. Curated rules (`.mdc`), Agent Skills, slash commands, and an MCP server covering languages, cloud platforms, DevOps tools, data platforms, identity systems, and engineering patterns.
+Comprehensive, battle-tested configuration for AI coding agents. Curated **rules** (`.mdc`), **Agent Skills**, **slash commands**, an **MCP server**, and **lifecycle hooks** covering languages, cloud platforms, DevOps tools, data platforms, identity systems, AI/ML, Zero Trust, and engineering patterns.
 
 > [!NOTE]
-> As of early February 2026, this repo is maintained to work with both **Cursor** and **Claude Code** conventions (rules, commands, and Agent Skills directory layouts).
+> **Agent-neutral.** Originally built for Cursor; today the content ships in formats compatible with **Cursor**, **Claude Code**, and **Codex** - rules (`.cursor/rules/`, `AGENTS.md`), Agent Skills (`.cursor/skills/`, `.claude/skills/`, `.codex/skills/`), and slash commands. The MCP server works with any MCP-compatible client.
+>
+> The repo name still says "cursor-engineering-rules" for historical reasons; rename pending.
 
 ---
 
@@ -109,9 +111,9 @@ Deterministic lifecycle hooks to observe/control agent behavior (for example: ga
 
 ---
 
-## Cursor Commands
+## Slash Commands
 
-Workflow commands for explicit phase transitions. Type `/command` in Cursor chat to trigger.
+Workflow commands for explicit phase transitions. Type `/command` in your agent's chat (Cursor / Claude Code / Codex) to trigger.
 
 | Command | Purpose |
 | --- | --- |
@@ -150,7 +152,7 @@ See [commands/README.md](commands/README.md) for detailed documentation.
 
 ## MCP Server
 
-Model Context Protocol (MCP) server for Cursor and other MCP-compatible AI clients.
+Model Context Protocol (MCP) server for any MCP-compatible AI client (Cursor, Claude Desktop, Claude Code, Codex, and others).
 
 ```bash
 # Install
