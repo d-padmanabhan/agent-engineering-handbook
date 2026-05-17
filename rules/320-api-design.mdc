@@ -20,7 +20,7 @@ files:
 **Goal**: Create consistent, secure, well-documented APIs that provide excellent developer experience
 
 > [!NOTE]
-> This rule covers the **API surface** (verbs, status codes, versioning, authn/authz, schemas). For the **transport and wire format layer beneath it** - TCP keepalive, HoL blocking, TTFB budget, HTTP/1.1 vs 2 vs 3, gRPC/Protobuf vs REST/JSON decision matrix, connection pooling, long-lived connections - see `skills/networking-transport/`. The two layers compose; both are required for production API decisions.
+> This rule covers the **API surface** (verbs, status codes, versioning, authn/authz, schemas). For the **transport and wire format layer beneath it** - TCP keepalive, HoL blocking, TTFB budget, HTTP/1.1 vs 2 vs 3, gRPC/Protobuf vs REST/JSON decision matrix, connection pooling, long-lived connections - see `325-networking.mdc` (file-scoped non-negotiables) and `skills/networking-transport/` (the depth). The two layers compose; both are required for production API decisions.
 
 ## API Design Philosophy (Core Principles)
 

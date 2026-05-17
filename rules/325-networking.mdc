@@ -1,0 +1,211 @@
+---
+title: Networking & Transport Non-Negotiables
+description: File-scoped non-negotiables for transport-layer code and protobuf schemas - HTTP/gRPC client reuse, TCP keepalive, wire-format choice, protobuf field-number safety, idle-timeout discipline.
+priority: 325
+alwaysApply: false
+files:
+  include:
+    - "**/*.proto"
+    - "**/buf.yaml"
+    - "**/buf.gen.yaml"
+    - "**/buf.lock"
+    - "**/buf.work.yaml"
+    - "**/.connect.yaml"
+    - "**/grpc.config.yaml"
+---
+
+# Networking & Transport Non-Negotiables
+
+**Audience:** engineers editing protobuf schemas, gRPC client/server code, network configuration (load balancers, edge), or HTTP client wiring.
+
+**Scope:** the rules that auto-load when you touch those files. The depth and reasoning live in the `networking-transport` skill (`skills/networking-transport/SKILL.md` plus references for the gRPC-vs-REST decision matrix and protobuf schema evolution). This rule codifies the **non-negotiables** so they appear in context without needing to invoke the skill.
+
+> [!IMPORTANT]
+> This rule complements `320-api-design.mdc` (API surface: verbs, status codes, versioning) and `316-zero-trust.mdc` Section 2 (network-tier security on top of the transport). Use this rule for transport-and-wire choices; use those for the API surface and the auth model.
+
+---
+
+## Transport non-negotiables
+
+### NN1. HTTP and gRPC clients are reused across requests
+
+A fresh client per request defeats connection pooling, defeats TCP keepalive, and burns 50-150ms / call on TCP+TLS handshake. The single most common production performance bug.
+
+- **Go:** package-level `http.Client` with a tuned `Transport`; do not construct one per call.
+- **Python:** module-level `requests.Session()` (or `httpx.Client`) with a mounted `HTTPAdapter`; do not call `requests.get()` ad-hoc in hot paths.
+- **Node:** shared `https.Agent({ keepAlive: true })` passed via `fetch(url, { agent })` (Node 18 and older defaults to `keepAlive: false`).
+- **gRPC:** one `Channel` per `(target, credentials)` pair, reused for the process lifetime; never `new Channel()` per call.
+
+### NN2. TCP keepalive is set explicitly and tuned below the load balancer idle timeout
+
+Linux defaults (`tcp_keepalive_time = 7200s` = 2 hours) are wrong for cloud. Load balancers cut idle connections much sooner; the client never notices until the next send fails.
+
+Set keepalive interval **less than** the proxy's idle timeout:
+
+| Proxy | Idle timeout | Suggested keepalive |
+|---|---|---|
+| AWS Network Load Balancer (NLB) | 350s (fixed) | 60-120s |
+| AWS Application LB (ALB) | 60s default (1-4000s configurable) | 30s (or half the configured) |
+| AWS API Gateway REST | 29s (fixed) | Don't keepalive; reconnect per request |
+| Cloudflare WebSocket | ~100s free / ~300s paid | Application-level heartbeat every 30-60s |
+| Nginx (`proxy_read_timeout`) | 60s | 30s |
+| Envoy (`stream_idle_timeout`) | 1h | 30-300s by use case |
+
+### NN3. Wire format choice is by callers and use case, not by hype
+
+| Caller / use case | Default choice | Why |
+|---|---|---|
+| External public API, browser-callable, third-party developers | **REST + JSON** | Curl-debuggable, OpenAPI tooling, broadest support, no code-gen burden on callers |
+| Internal east-west, polyglot, you own both ends | **gRPC + Protobuf** | Schema-first, code-gen, streaming, ~5-10x smaller wire, ~3-5x faster ser/deser |
+| Browser <-> backend with Protobuf contract | **Connect** (or REST) | gRPC needs gRPC-Web + proxy; Connect calls work with plain `fetch` |
+| Long-lived bidirectional service-to-service streaming | **gRPC streaming** | First-class concept; one HTTP/2 stream per session |
+| Client-driven shape (mobile picks fields per query) | **GraphQL** | Single endpoint, projection-by-query |
+
+Do not ship gRPC as a **public** API unless your callers have specifically agreed to the tooling burden. The browser-friendly, curl-debuggable, cache-friendly default is REST.
+
+### NN4. Long-lived connections have application-level heartbeats
+
+WebSocket, SSE, and gRPC streaming all die silently when an intermediate proxy hits its idle timeout. TCP keepalive alone is not enough; many proxies measure idle at the application layer.
+
+- WebSocket: ping/pong every 30-60s (under the smallest proxy idle in the path).
+- SSE: emit a `: keepalive` comment line every 30-60s.
+- gRPC streaming: rely on HTTP/2 PING (configured via channel keepalive options) plus application-level heartbeats for app-aware liveness.
+- All: implement reconnect with exponential backoff + jitter; do not assume one connection lasts forever.
+
+### NN5. HTTP/3 is enabled at the edge for mobile / cross-region / lossy paths (where supported)
+
+HTTP/2's TCP-level head-of-line blocking degrades P95/P99 on lossy networks. HTTP/3 over QUIC eliminates it at the transport layer.
+
+- Public-facing edge (Cloudflare, Fastly, CloudFront): HTTP/3 on if your CDN supports it (all major CDNs do as of 2025+).
+- Mobile-heavy traffic: HTTP/3 helps disproportionately.
+- Internal east-west on LAN with <0.001% loss: HTTP/2 is fine; HTTP/3 buys little.
+- Prerequisites: TLS 1.3, UDP/443 reachable end-to-end, `alt-svc` header advertised. Some corporate proxies filter UDP; provide HTTP/2 fallback.
+
+---
+
+## Protobuf non-negotiables
+
+When editing any `.proto` file:
+
+### PB1. Never re-number a field
+
+Field numbers are the wire identity. Renumbering corrupts every existing serialized message and breaks every downstream consumer. There is **no** safe way to renumber a field that has shipped.
+
+If you must change a field's semantics, add a new field with a new number and `reserve` the old one.
+
+### PB2. Removed fields get `reserved` for both number AND name
+
+Reserving the number prevents future re-use that would corrupt old data. Reserving the name prevents accidental re-introduction of the same logical field with different semantics.
+
+```protobuf
+message User {
+  string id = 1;
+  string email = 2;
+  // string display_name = 3;     // removed in v1.4
+  reserved 3;
+  reserved "display_name";
+}
+```
+
+### PB3. Use `optional` keyword or wrapper types for proto3 presence semantics
+
+In proto3, scalar fields with their default value (zero, empty string, false) do not appear on the wire. Receivers cannot distinguish "set to 0" from "absent". When that distinction matters:
+
+```protobuf
+// preferred (proto3 since release 3.15, Feb 2020)
+optional int32 max_attempts = 1;
+
+// fallback for older toolchains
+import "google/protobuf/wrappers.proto";
+google.protobuf.Int32Value max_attempts = 1;
+```
+
+Do not invent sentinel values (`-1` means absent) - brittle, undocumented, easy to miss.
+
+### PB4. Package versioning convention: `<org>.<domain>.v<N>`
+
+```protobuf
+package myorg.users.v1;
+```
+
+Major-version the package, not individual messages. `v1` stays for backward compatibility; breaking changes go in `v2`. Service-versioning (`UsersV1`, `UsersV2`) is acceptable as an alternative if used consistently.
+
+### PB5. `buf breaking` runs in CI against the merge base
+
+The single highest-value gate for protobuf schema discipline. Catches every PB1-PB3 violation automatically.
+
+```yaml
+# .buf.yaml
+version: v1
+breaking:
+  use:
+    - WIRE_JSON
+```
+
+```yaml
+# .github/workflows/proto.yml step
+- run: buf breaking --against '.git#branch=main'
+```
+
+Also recommended: `buf lint` for style, `buf format` for normalization, `protovalidate` for cross-language validation rules expressed in the `.proto` itself.
+
+---
+
+## Common anti-patterns (reviewers reject these)
+
+| Anti-pattern | Why it's wrong |
+|---|---|
+| `http.Get(url)` / `requests.get(url)` / `fetch(url)` in hot paths | New client per call -> no keepalive -> handshake tax per request |
+| Default OS TCP keepalive in cloud | 2-hour idle means dead-peer detection happens long after the LB cut |
+| `keepalive > load balancer idle timeout` | LB wins; "random" disconnects appear in P99 |
+| Renumbering a protobuf field | Wire-incompatible; corrupts every existing serialized message |
+| Removing a protobuf field without `reserved` | Sets up the next change to silently reuse the number and corrupt data |
+| Scalar field for true optional semantics in proto3 | Default-value doesn't serialize; receiver can't distinguish set-to-zero from absent |
+| gRPC as a browser-callable public API without Connect / gRPC-Web | Doesn't work; teams discover too late |
+| Stripping unknown protobuf fields in middleware | Destroys forward compatibility |
+| One protobuf file with everything | Hard to evolve; circular imports |
+| `rev: nightly` or `rev: main` on protobuf-related pre-commit hooks | Mutable references; pin to a release tag |
+
+---
+
+## Reviewer checklist
+
+For HTTP / gRPC client code:
+
+- [ ] Client / channel created once (package-level, DI, singleton) and reused
+- [ ] Explicit timeout set (overall request, not just connect)
+- [ ] TCP keepalive interval set, less than load balancer idle timeout
+- [ ] Pool size (`MaxIdleConnsPerHost` etc.) sized to workload, not left at default
+- [ ] TLS minimum is 1.2; prefer 1.3
+- [ ] Retry policy bounded (max attempts, max total time, exponential backoff with jitter)
+- [ ] Metrics emitted: latency histogram, status counter, connection-reuse ratio
+
+For `.proto` changes:
+
+- [ ] No field renumbered (verified by `buf breaking`)
+- [ ] Removed fields have `reserved` for both number AND name
+- [ ] New fields use unused numbers (never reused)
+- [ ] Optional semantics use `optional` keyword or wrapper types, not scalar defaults
+- [ ] Package is version-suffixed (`org.domain.vN`)
+- [ ] `buf breaking` runs in CI against the merge base
+- [ ] Generated code policy is consistent (committed XOR generated in CI; not both)
+
+For long-lived connections (WebSocket / SSE / gRPC streaming):
+
+- [ ] Application-level heartbeat every 30-60s
+- [ ] Reconnect logic with exponential backoff + jitter
+- [ ] Idle timeout configured at every proxy in the path (or smallest-wins documented)
+
+---
+
+## See also
+
+- Skill: `networking-transport` - depth on TCP keepalive, HoL blocking, TTFB budget, HTTP/n choice, wire format decision, long-lived connections, edge/CDN, observability
+- Skill: `networking-transport/references/grpc-vs-rest-decision.md` - decision matrix with worked examples
+- Skill: `networking-transport/references/protobuf-schema-evolution.md` - schema evolution rules in depth
+- Rule: `320-api-design.mdc` - API surface (verbs, status codes, versioning)
+- Rule: `316-zero-trust.mdc` - Network section (mTLS, default-deny egress)
+- Rule: `330-observability.mdc` - logging, metrics, tracing patterns
+- Rule: `400-cloudflare.mdc` - edge / CDN patterns
+- Rule: `410-aws.mdc` - AWS LB and API Gateway idle-timeout specifics
+- Rule: `483-kafka.mdc` - Kafka transport + Avro/Protobuf schema registry

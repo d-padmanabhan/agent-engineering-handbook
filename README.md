@@ -66,6 +66,7 @@ Comprehensive, battle-tested configuration for AI coding agents. Curated **rules
 ### Patterns & Best Practices
 
 - **[320-api-design.mdc](rules/320-api-design.mdc)** - REST API design patterns
+- **[325-networking.mdc](rules/325-networking.mdc)** - Networking & transport non-negotiables (file-scoped to .proto / buf.* / gRPC config); see also the `networking-transport` skill
 - **[330-observability.mdc](rules/330-observability.mdc)** - Logging, metrics, tracing
 - **[470-postgresql.mdc](rules/470-postgresql.mdc)** - PostgreSQL patterns
 - **[475-sql.mdc](rules/475-sql.mdc)** - Safe SQL patterns (transactions, destructive guardrails)

@@ -52,6 +52,7 @@ Quick lookup table for all Cursor rules files in `rules/`.
 | [317-okta.mdc](317-okta.mdc) | Okta Workforce Identity: orgs, apps, users/groups, policies, lifecycle (SCIM), Workflows, Advanced Server Access, Admin API, and terraform-provider-okta. | 317 | No |
 | [318-workload-identity.mdc](318-workload-identity.mdc) | Attestation-based workload identity: SPIFFE/SPIRE/SVIDs/mTLS, cloud IAM (IRSA, GCP WI, Managed Identity, VPC Lattice), and OIDC federation bridges. | 318 | No |
 | [320-api-design.mdc](320-api-design.mdc) | REST API design patterns, GraphQL, gRPC, versioning, authentication, and API documentation standards | 320 | No |
+| [325-networking.mdc](325-networking.mdc) | Networking & transport non-negotiables: HTTP/gRPC client reuse, TCP keepalive, wire-format choice, protobuf field-number safety, idle-timeout discipline. File-scoped to .proto and buf.* files. | 325 | No |
 | [330-observability.mdc](330-observability.mdc) | Logging, metrics, tracing, alerting, and observability patterns for production systems | 330 | No |
 
 ## Cloud & Infrastructure (400-499)

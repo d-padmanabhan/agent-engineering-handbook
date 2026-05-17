@@ -98,6 +98,7 @@ export class ApiClient {
         okta: '317-okta.mdc',
         'workload-identity': '318-workload-identity.mdc',
         'api-design': '320-api-design.mdc',
+        networking: '325-networking.mdc',
         observability: '330-observability.mdc',
       },
       data: {
@@ -207,6 +208,7 @@ export class ApiClient {
       { category: 'patterns', topic: 'okta', title: 'Okta Workforce Identity', description: 'Orgs, apps, users/groups, policies, SCIM, Workflows, ASA, Admin API, terraform-provider-okta', priority: 317, content: '' },
       { category: 'patterns', topic: 'workload-identity', title: 'Workload Identity (SPIFFE, SPIRE, Cloud IAM)', description: 'Attestation-based workload identity: SPIFFE/SPIRE/SVIDs/mTLS, IRSA/GCP WI/Managed Identity, OIDC federation', priority: 318, content: '' },
       { category: 'patterns', topic: 'api-design', title: 'API Design', description: 'REST, GraphQL, gRPC patterns', priority: 320, content: '' },
+      { category: 'patterns', topic: 'networking', title: 'Networking & Transport', description: 'HTTP/gRPC client reuse, TCP keepalive, wire-format choice, protobuf field-number safety, idle-timeout discipline (file-scoped to .proto / buf.*)', priority: 325, content: '' },
       { category: 'patterns', topic: 'observability', title: 'Observability', description: 'Logging, metrics, tracing', priority: 330, content: '' },
 
       // Data

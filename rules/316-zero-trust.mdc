@@ -115,7 +115,7 @@ See `315-iam.mdc` and `412-aws-iam.mdc` for protocol-level detail.
 - Security groups as your primary authorization control.
 - "Internal" APIs without authentication because "it's behind the VPC".
 
-Cross-refs: `410-aws.mdc`, `420-gcp.mdc`, `430-azure.mdc`, `400-cloudflare.mdc`, `450-kubernetes.mdc`. For the transport layer underneath (TCP keepalive, HoL blocking, HTTP/2 vs 3, wire format choice), see the `networking-transport` skill - Zero Trust auth sits on top of whatever transport you choose.
+Cross-refs: `410-aws.mdc`, `420-gcp.mdc`, `430-azure.mdc`, `400-cloudflare.mdc`, `450-kubernetes.mdc`. For the transport layer underneath (TCP keepalive, HoL blocking, HTTP/2 vs 3, wire format choice), see `325-networking.mdc` and the `networking-transport` skill - Zero Trust auth sits on top of whatever transport you choose.
 
 ---
 
