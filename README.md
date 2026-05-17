@@ -506,6 +506,7 @@ Skills under `skills/` cover repeatable end-to-end workflows that pair with the 
 - **[skills/snowflake](skills/snowflake/)** - Snowflake operational playbook
 - **[skills/databricks](skills/databricks/)** - Databricks operational playbook
 - **[skills/cicd-github-actions](skills/cicd-github-actions/)** - GitHub Actions patterns
+- **[skills/networking-transport](skills/networking-transport/)** - TCP keepalive, HoL blocking, TTFB budget, HTTP/1.1 vs 2 vs 3, gRPC/Protobuf vs REST/JSON, connection pooling, long-lived connections
 
 ### AI, MCP & analysis
 
