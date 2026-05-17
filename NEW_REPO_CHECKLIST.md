@@ -145,18 +145,41 @@ mkdir -p tmp/pr tmp/pr_reviews tmp/agent_reports tmp/bug_reports
 
 ## 8. Pre-commit hooks (recommended)
 
-Mirror this repo's pre-commit stack so your consumer repo gets the same secret-scanning + lint baseline.
+Mirror this repo's pre-commit stack so your consumer repo gets the same lint + safety baseline. The full config is at [`.pre-commit-config.yaml`](.pre-commit-config.yaml); copy it as-is.
 
 ```bash
 brew install pre-commit                                  # macOS
 # pip install pre-commit                                 # any platform
 
 cp /path/to/cursor-engineering-rules/.pre-commit-config.yaml .pre-commit-config.yaml
+cp /path/to/cursor-engineering-rules/.markdownlint.yaml   .markdownlint.yaml
 pre-commit install
 pre-commit run --all-files                               # baseline run
 ```
 
-Key hooks: `gitleaks`, `ggshield` (secret scanning), `pre-commit-hooks` (trailing whitespace, large files, private keys, mixed line endings), `markdownlint`.
+Hooks in the shipped config:
+
+| Repo | Hook(s) | Purpose |
+|---|---|---|
+| `pre-commit/pre-commit-hooks` v6.0.0 | `trailing-whitespace` (excludes `*.md`), `end-of-file-fixer` (excludes `*.mdc`), `check-yaml`, `check-added-large-files` (1 MB cap), `mixed-line-ending` (forces LF), `check-case-conflict`, `check-merge-conflict`, `detect-private-key` | File hygiene + obvious safety |
+| `igorshubovych/markdownlint-cli` v0.47.0 | `markdownlint` with `--fix --config .markdownlint.yaml` | Markdown style enforcement (auto-fixes most issues) |
+| `lycheeverse/lychee` nightly | `lychee` (stage: `manual`, files: `*.md` / `*.mdc`) | Link checker - run on demand: `pre-commit run lychee --hook-stage manual` |
+
+### Secret scanning (separate from `.pre-commit-config.yaml`)
+
+`ggshield` (GitGuardian) installs as its own git hook and runs **before** pre-commit-config.yaml. Install per-repo:
+
+```bash
+brew install gitguardian/tap/ggshield                    # macOS
+# pipx install ggshield                                  # any platform
+
+ggshield auth login                                      # one-time
+ggshield install --mode local --type pre-commit          # per-repo
+```
+
+`ggshield` complements the config's `detect-private-key` (which only catches a small set of recognized key formats) with full GitGuardian secret detection.
+
+For broader regex + entropy coverage (CI-grade), wire `gitleaks` into your GitHub Actions workflow instead of pre-commit; see the [`codebase-security-audit` skill's CI workflow reference](skills/codebase-security-audit/references/ci-workflow.md).
 
 ## 9. Git hygiene
 
