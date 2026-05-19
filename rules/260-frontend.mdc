@@ -1,0 +1,162 @@
+---
+title: Frontend Architecture (SPA, SSG, SSR, ISR) - Cross-cutting Non-Negotiables
+description: Framework-agnostic frontend rules covering rendering choice, bundle budgets, three-bucket state management, accessibility floor, Core Web Vitals targets, testing pyramid, and supply-chain security. File-scoped to common frontend project files.
+priority: 260
+alwaysApply: false
+files:
+  include:
+    - "**/*.tsx"
+    - "**/*.jsx"
+    - "**/*.vue"
+    - "**/*.svelte"
+    - "**/*.astro"
+    - "**/vite.config.*"
+    - "**/next.config.*"
+    - "**/nuxt.config.*"
+    - "**/gatsby-config.*"
+    - "**/astro.config.*"
+    - "**/svelte.config.*"
+    - "**/remix.config.*"
+    - "**/hugo.toml"
+    - "**/hugo.yaml"
+    - "**/.lighthouserc.*"
+    - "**/lighthouse.config.*"
+    - "**/bundlewatch.config.*"
+    - "**/.size-limit.*"
+---
+
+# Frontend Architecture - Cross-cutting Non-Negotiables
+
+**Audience:** engineers designing, reviewing, or operating browser-facing applications and static sites - regardless of framework (React, Vue, Svelte, Solid, Astro, Next, Nuxt, Gatsby, Hugo, Eleventy, SvelteKit, Remix).
+
+**Scope:** the choices that apply *the same way* across frameworks. For framework-specific advice (React Server Components, Vue Composition API, Hugo partials, etc.), defer to the framework's docs and to `999-local-overrides.mdc` in each consumer repo. This rule is the cross-cutting layer; the skill `frontend-engineering` is the depth.
+
+> [!IMPORTANT]
+> Frontend rules in this repo are intentionally framework-agnostic. Adding React/Vue/Hugo encyclopedia content here would be shallow guidance authored from docs, not earned from production reviews. Pin framework-specific guidance in `999-local-overrides.mdc` per repo.
+
+---
+
+## Non-negotiables
+
+### NN1. Rendering choice is made before code lands
+
+SPA / SSG / SSR / ISR / hybrid is an architecture decision, not a default. Document it in an ADR or the README before the first feature commit.
+
+| Pattern | When | Trade-off |
+|---|---|---|
+| **SSG** (static site generation) | Content changes less than daily; SEO matters; no per-user state | Cheapest hosting (CDN-only); rebuild on every change |
+| **SSR** (per-request) | Per-user content; SEO matters; freshness matters | Server cost; slower TTFB than SSG if not cached |
+| **SPA** (client-side render) | Internal tools; authenticated apps; no SEO need | Worst TTFB / FCP; bad on slow networks; richest interactivity |
+| **ISR** (incremental SSG) | Mostly-static with occasional updates | SSG cost + on-demand re-render budget |
+| **Hybrid** (RSC, islands, partial hydration) | Mix of above per route | Most complex; biggest payoff at scale |
+
+### NN2. Bundle budget per route is enforced in CI
+
+Every PR runs against a budget. PRs that breach are blocked until either the budget is raised (with justification in the PR description) or the code is trimmed. Raising the budget silently is the same anti-pattern as suppressing a test.
+
+| Route type | Initial JS budget | LCP target |
+|---|---|---|
+| Marketing / landing | < 100 KB gz | < 1.5s |
+| App shell / dashboard | < 200 KB gz | < 2.5s |
+| Heavy app route (editor / map / chart) | < 400 KB gz | < 3.0s |
+
+Tooling: Lighthouse CI, `bundlewatch`, `size-limit`, `@next/bundle-analyzer` + CI gate, `rollup-plugin-visualizer` for Vite, `webpack-bundle-analyzer` for legacy stacks.
+
+### NN3. Three buckets for state; never mix
+
+| State class | Where it lives | Examples |
+|---|---|---|
+| **Local UI state** | `useState` / `ref` / `signal` | Form field value, modal open/closed, hover state |
+| **Server state** | TanStack Query / SWR / Apollo / urql / Pinia query | API responses, mutations, cache invalidation, optimistic updates |
+| **Global client state** | Zustand / Redux Toolkit / Pinia store / nanostores | Auth user, feature flags, theme, in-flight workflow state |
+
+The most common frontend refactor: server data stuffed into Redux/Zustand with hand-rolled caching, invalidation, refetch-on-focus, and request dedup. Use a server-state library; that problem is solved.
+
+### NN4. Accessibility floor: WCAG 2.2 AA, axe-core in CI
+
+- All routes pass `axe-core` (zero violations) before merge. Block PRs on regressions.
+- Manual screen-reader pass on the four primary user flows before any release.
+- All interactive elements keyboard-reachable; tab order makes sense.
+- Color contrast: 4.5:1 for text under 18pt, 3:1 above.
+- Forms: labels, programmatically marked required fields, errors announced.
+
+Tooling: `axe-core` + `@axe-core/playwright` (or `cypress-axe`) for component / E2E; `eslint-plugin-jsx-a11y` (or `eslint-plugin-vuejs-accessibility`) for component lint; Lighthouse a11y score >= 95 for marketing pages.
+
+### NN5. Core Web Vitals targets (75th percentile, real users)
+
+| Metric | Target | What it measures |
+|---|---|---|
+| **LCP** (Largest Contentful Paint) | < 2.5s | When the main content is visible |
+| **INP** (Interaction to Next Paint) | < 200ms | Responsiveness to user input |
+| **CLS** (Cumulative Layout Shift) | < 0.1 | Visual stability |
+
+Measure with **RUM** (real user monitoring): `web-vitals` library + your analytics. Lab-only (Lighthouse in CI) misses real-world variance. Set CI gates on lab numbers as a floor; RUM is the truth.
+
+### NN6. Testing pyramid for frontend
+
+| Layer | Tool | What it catches |
+|---|---|---|
+| **Unit** (most) | Vitest / Jest | Pure functions, utils, reducers, hooks in isolation |
+| **Component** | Testing Library (RTL / Vue / Svelte) | Component behavior from user POV (clicks, accessibility queries, render output) |
+| **E2E** (fewest) | Playwright / Cypress | Critical user flows end-to-end (sign-in, checkout, primary feature) |
+| **Visual regression** (opt-in) | Chromatic / Percy / Playwright snapshots | Styling drift on a small, intentionally selected surface |
+
+Avoid: snapshot tests of entire components (brittle, noisy); E2E for things a component test could cover (slow, flaky).
+
+### NN7. Supply-chain + security defaults
+
+- **CSP** (Content Security Policy) header: `default-src 'self'` minimum; explicitly allow what you actually need; reject inline scripts.
+- **SRI** (Subresource Integrity) hashes for any CDN-loaded script you do not control.
+- **Dependency scanning in CI**: `npm audit` (or `pnpm audit` / `yarn audit`), `dependabot` or Renovate enabled, block on Critical/High CVEs.
+- **No unverified `npx` in build steps.** Pin package versions; CI verifies the lockfile.
+- **COOP / COEP** only if you actually need `SharedArrayBuffer` or isolation; otherwise skip and don't break embedded content (Stripe, YouTube, etc.).
+- **No secrets in client bundles.** Build-time env vars with public names (`PUBLIC_*` / `VITE_*` / `NEXT_PUBLIC_*`) are **baked into the bundle**. Secrets stay server-side.
+
+---
+
+## Common anti-patterns
+
+| Anti-pattern | Why it's wrong |
+|---|---|
+| Defaulting to SPA for content sites | SEO suffers; TTFB is worst; no SSG benefit |
+| Server data in global client state (Redux/Zustand) | Re-implements caching badly; use TanStack Query / SWR / Pinia query |
+| `dangerouslySetInnerHTML` / `v-html` with user input | XSS; sanitize or render as text |
+| Lighthouse-only perf measurement | Lab numbers do not equal real users; need RUM |
+| One giant `_app.tsx` / `App.vue` with all providers | Hard to refactor; per-route providers when scope is per-route |
+| Visual regression on every component | Brittle; PR noise; opt-in per-component when actually needed |
+| Disabling `react-hooks/exhaustive-deps` to silence warnings | Hides real bugs; fix the dep array or memo properly |
+| `tsconfig.strict: false` for "speed" | The bugs you save now you will find at 3am |
+| Inline event handlers in heavy lists | Re-allocates per render; ok for leaves, problem for virtualized rows |
+| No CSP header | Inline-script XSS; CDN compromise propagates |
+| Secrets in `NEXT_PUBLIC_*` / `VITE_*` | Baked into the bundle; visible to every user |
+| `npm install` (vs `npm ci`) in CI | Lockfile bypass; non-reproducible builds |
+
+---
+
+## Reviewer checklist
+
+For a new frontend PR:
+
+- [ ] Rendering choice documented (per-route if mixed)
+- [ ] Bundle delta within budget (CI report attached)
+- [ ] State changes use the right bucket (local / server / global)
+- [ ] `axe-core` passes; keyboard reachable; contrast checked
+- [ ] No new Core Web Vitals regression (lab + RUM if available)
+- [ ] Tests at the right layer (unit for logic, component for UI, E2E for critical flows)
+- [ ] No new dependency unless justified; lockfile up to date
+- [ ] No secrets in client code; only `PUBLIC_*` / `VITE_*` / `NEXT_PUBLIC_*` env vars
+- [ ] CSP unchanged or tightened, never loosened
+
+---
+
+## See also
+
+- Skill: `frontend-engineering` - depth on rendering choice, bundle budgets, INP debugging, state management, perf workflows
+- Rule: `230-javascript.mdc` - JavaScript foundations (ESM, async/await, error handling)
+- Rule: `240-typescript.mdc` - TypeScript strict mode, React + TypeScript snippets
+- Rule: `320-api-design.mdc` - API surface (REST / GraphQL / gRPC) for frontend-to-backend calls
+- Rule: `325-networking.mdc` - HTTP/n choice, TTFB, connection reuse for the frontend's outbound calls
+- Rule: `310-security.mdc` - OWASP for application security context
+- Rule: `330-observability.mdc` - frontend RUM, error tracking, structured logging
+- Rule: `400-cloudflare.mdc` - edge / CDN patterns for SSG and SSR-at-edge
+- Rule: `999-local-overrides.mdc` (in each consumer repo) - pin framework-specific guidance per project

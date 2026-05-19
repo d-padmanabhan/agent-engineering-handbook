@@ -34,6 +34,7 @@ Quick lookup table for all Cursor rules files in `rules/`.
 | [220-rust.mdc](220-rust.mdc) | Modern Rust patterns, ownership, error handling, async/await, and production-ready development practices | 220 | No |
 | [230-javascript.mdc](230-javascript.mdc) | Secure-by-default, type-checked (JSDoc + @ts-check), performant, and testable JavaScript guidelines for generation and review. | 230 | No |
 | [240-typescript.mdc](240-typescript.mdc) | Modern TypeScript patterns, type safety, advanced types, and production-ready configuration | 240 | No |
+| [260-frontend.mdc](260-frontend.mdc) | Framework-agnostic frontend non-negotiables: rendering choice (SSG/SSR/SPA/ISR), bundle budgets, three-bucket state, WCAG 2.2 AA, Core Web Vitals, testing pyramid, supply-chain security. File-scoped to .tsx/.vue/.svelte/config files. | 260 | No |
 
 ## Tools & Platforms (250-299)
 

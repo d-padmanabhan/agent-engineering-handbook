@@ -566,6 +566,9 @@ class UserRepository extends BaseRepository<User> {
 
 ## React with TypeScript
 
+> [!NOTE]
+> This section covers React + TypeScript syntax patterns. For the **cross-cutting frontend architecture rules** that apply to React, Vue, Svelte, and other frameworks - rendering choice (SSG/SSR/SPA/ISR), bundle budgets, three-bucket state management, WCAG 2.2 AA enforcement, Core Web Vitals targets, testing pyramid, supply-chain security - see `260-frontend.mdc` and the `frontend-engineering` skill.
+
 ### Functional Components with Props
 ```typescript
 //  GOOD - Explicit prop types

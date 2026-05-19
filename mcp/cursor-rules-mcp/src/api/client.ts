@@ -69,6 +69,7 @@ export class ApiClient {
         rust: '220-rust.mdc',
         javascript: '230-javascript.mdc',
         typescript: '240-typescript.mdc',
+        frontend: '260-frontend.mdc',
       },
       infrastructure: {
         justfile: '150-justfile.mdc',
@@ -179,6 +180,7 @@ export class ApiClient {
       { category: 'languages', topic: 'rust', title: 'Rust', description: 'Ownership, lifetimes, async, error handling', priority: 220, content: '' },
       { category: 'languages', topic: 'javascript', title: 'JavaScript', description: 'ES modules, async/await, Node.js patterns', priority: 230, content: '' },
       { category: 'languages', topic: 'typescript', title: 'TypeScript', description: 'Strict mode, ESM, modern patterns', priority: 240, content: '' },
+      { category: 'languages', topic: 'frontend', title: 'Frontend Architecture (cross-cutting)', description: 'Framework-agnostic frontend non-negotiables: rendering choice, bundle budgets, three-bucket state, accessibility floor, Core Web Vitals, testing pyramid, supply-chain security', priority: 260, content: '' },
 
       // Infrastructure
       { category: 'infrastructure', topic: 'justfile', title: 'Justfile', description: 'Modern command runner patterns', priority: 150, content: '' },

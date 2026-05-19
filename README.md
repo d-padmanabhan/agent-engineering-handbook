@@ -29,6 +29,7 @@ Comprehensive, battle-tested configuration for AI coding agents. Curated **rules
 - **[210-go.mdc](rules/210-go.mdc)** - Go patterns (error handling, concurrency, generics)
 - **[230-javascript.mdc](rules/230-javascript.mdc)** - JavaScript/Node.js (ES modules, async/await)
 - **[240-typescript.mdc](rules/240-typescript.mdc)** - TypeScript (type safety, advanced types)
+- **[260-frontend.mdc](rules/260-frontend.mdc)** - Frontend architecture cross-cutting non-negotiables (SSG/SSR/SPA/ISR choice, bundle budgets, state buckets, WCAG, Core Web Vitals, supply-chain); pairs with the `frontend-engineering` skill
 - **[220-rust.mdc](rules/220-rust.mdc)** - Rust (ownership, borrowing, async)
 - **[140-bash.mdc](rules/140-bash.mdc)** - Shell scripting (POSIX compliance, safety)
 
@@ -483,6 +484,7 @@ Skills under `skills/` cover repeatable end-to-end workflows that pair with the 
 - **[skills/core-engineering](skills/core-engineering/)** - core engineering principles, code review
 - **[skills/python-development](skills/python-development/)** - Python 3.14+ patterns
 - **[skills/typescript-javascript](skills/typescript-javascript/)** - TS/JS patterns
+- **[skills/frontend-engineering](skills/frontend-engineering/)** - framework-agnostic frontend playbook (rendering, bundles, state, a11y, perf, testing, security)
 - **[skills/go-rust-systems](skills/go-rust-systems/)** - Go and Rust systems programming
 - **[skills/bash-shell-scripting](skills/bash-shell-scripting/)** - production Bash scripts
 - **[skills/scripting-automation](skills/scripting-automation/)** - advanced Bash automation
