@@ -77,7 +77,7 @@ Stateful, single-instance Workers with strongly-consistent storage. The right pr
 - **Single-threaded per instance.** All requests to the same DO are serialized. A slow `fetch` blocks every other caller of that instance. Move slow work to alarms or other Workers.
 - **Use SQLite-backed storage by default** (`new_sqlite_classes` in your migration). `state.storage.sql.exec("SELECT ...")` is faster and cheaper than `storage.put/get` for anything relational. Plain KV-style `storage.put/get` is fine for tiny counters and flags.
 - **All writes are transactional.** Individual `storage.put` calls are atomic; group multiple writes via `state.storage.transaction(async (txn) => { ... })`.
-- **Hibernate websockets.** Use the Hibernation API (`state.acceptWebSocket(ws)`, `webSocketMessage`, `webSocketClose`) instead of long-lived `addEventListener` handlers — the instance can sleep between messages and you only pay for active work.
+- **Hibernate websockets.** Use the Hibernation API (`state.acceptWebSocket(ws)`, `webSocketMessage`, `webSocketClose`) instead of long-lived `addEventListener` handlers - the instance can sleep between messages and you only pay for active work.
 - **Alarms for delayed / periodic work.** `state.storage.setAlarm(timestamp)` plus an `async alarm()` handler survives migrations and reschedules. Do not use `setTimeout`.
 - **Block hot keys.** A single DO for "global rate limiter keyed by something with one value" is a hotspot. Shard by request hash or tenant.
 - **Handle 503 Durable Object reset.** During deployment migrations the DO can be killed mid-request; clients must retry. Surface this in your SDK / client code with backoff.
@@ -251,7 +251,7 @@ ENVIRONMENT = "production"
 
 ### Pages Functions
 
-File-routed Workers attached to a Pages project. Files under `functions/` map to URL paths automatically — `functions/api/users/[id].ts` handles `GET /api/users/:id`. Pages Functions and standalone Workers share the same runtime and bindings; pick Pages when the project also has static assets, pick a plain Worker when it's API-only.
+File-routed Workers attached to a Pages project. Files under `functions/` map to URL paths automatically - `functions/api/users/[id].ts` handles `GET /api/users/:id`. Pages Functions and standalone Workers share the same runtime and bindings; pick Pages when the project also has static assets, pick a plain Worker when it's API-only.
 
 #### Core rules
 
@@ -325,7 +325,7 @@ Only paths under `include` walk the functions tree; everything else serves from 
 - Middleware that throws without catching. Pages returns a 500 with no context. Wrap in `try/catch` and return a structured error.
 - Calling `fetch(context.request)` from middleware. Creates an infinite loop through the routing tree. Use `await next()`.
 - No `_routes.json` on a SPA. Functions intercept asset 404s; you waste invocations and your bundle requests hit cold-start latency.
-- Storing per-request state in module scope. Same Worker-isolate caveat applies — module scope is shared across requests, sometimes across deployments.
+- Storing per-request state in module scope. Same Worker-isolate caveat applies - module scope is shared across requests, sometimes across deployments.
 
 ## D1 Database
 
@@ -384,7 +384,7 @@ for (const object of list.objects) {
 
 ### R2 Event Notifications
 
-Push notifications to a Queue when objects are created, deleted, or restored in a bucket. The consumer is a regular Queues consumer (see [Queues](#queues)) — same idempotency, batching, DLQ rules apply.
+Push notifications to a Queue when objects are created, deleted, or restored in a bucket. The consumer is a regular Queues consumer (see [Queues](#queues)) - same idempotency, batching, DLQ rules apply.
 
 #### Core rules
 
@@ -450,13 +450,13 @@ export default {
 
 ## Workflows
 
-Durable, replayable, multi-step orchestration on top of Workers. Use for long-running business logic (minutes to days), fan-out/fan-in pipelines, and agent-driven processes. As of Workflows v2 (May 2026), limits are 50k concurrent instances, 300 new/sec/account, and 2M queued per workflow — v2 is a transparent backend rearchitecture with no API changes.
+Durable, replayable, multi-step orchestration on top of Workers. Use for long-running business logic (minutes to days), fan-out/fan-in pipelines, and agent-driven processes. As of Workflows v2 (May 2026), limits are 50k concurrent instances, 300 new/sec/account, and 2M queued per workflow - v2 is a transparent backend rearchitecture with no API changes.
 
 ### Core rules
 
-- **Every side effect goes inside `step.do`.** Anything outside a step runs again on every replay, including HTTP calls, DB writes, and queue sends — that is the most common Workflows footgun.
+- **Every side effect goes inside `step.do`.** Anything outside a step runs again on every replay, including HTTP calls, DB writes, and queue sends - that is the most common Workflows footgun.
 - **Steps must be deterministic and idempotent.** A step that retries must be safe to run again. Use idempotency keys for external POSTs; use `upsert`/`merge` for DB writes.
-- **Step return values must be JSON-serializable.** They are persisted and rehydrated on replay. No `Date`, `Map`, `Set`, class instances, or `undefined` properties — convert to plain objects/strings/numbers.
+- **Step return values must be JSON-serializable.** They are persisted and rehydrated on replay. No `Date`, `Map`, `Set`, class instances, or `undefined` properties - convert to plain objects/strings/numbers.
 - **Use `step.sleep` / `step.sleepUntil` for waits**, never `setTimeout` or `await new Promise(r => setTimeout(r, ...))`. Only `step.sleep` survives hibernation.
 - **Use `step.waitForEvent` for external triggers** (human approval, webhook callbacks) instead of polling loops.
 - **Tune `retries` per step.** Cheap idempotent steps can retry aggressively; expensive or non-idempotent steps should retry few times with backoff and surface failures.
@@ -543,7 +543,7 @@ class_name = "OrderWorkflow"
 
 ```typescript
 const instance = await env.ORDER_WORKFLOW.create({
-  id: `order-${orderId}`,          // optional but recommended — enables idempotent creation
+  id: `order-${orderId}`,          // optional but recommended - enables idempotent creation
   params: { userId, orderId },
 });
 
@@ -555,7 +555,7 @@ const status = await instance.status();   // 'queued' | 'running' | 'paused' | '
 - Putting `await fetch(...)` or `await db.query(...)` directly in `run()` outside a `step.do`. Replay will re-execute it.
 - Returning a class instance, `Map`, or `Date` from a step. It will not survive serialization.
 - Using `setTimeout` or wall-clock `Date.now()` comparisons for delays. Use `step.sleep` and `step.sleepUntil`.
-- One giant step that does ten things. Split — each `step.do` is your retry boundary and your replay savepoint.
+- One giant step that does ten things. Split - each `step.do` is your retry boundary and your replay savepoint.
 - Polling an external system in a loop. Use `step.waitForEvent` or `step.sleep` between attempts.
 
 ## Queues
@@ -654,13 +654,13 @@ await env.KV.delete('key');
 
 ## Hyperdrive
 
-Connection pool + query cache that lets Workers talk to external Postgres / MySQL databases without paying per-request TCP handshake cost. Use Hyperdrive any time you need to query a regional Postgres/MySQL from Workers — direct connections from Workers are slow and burn your DB's connection limit.
+Connection pool + query cache that lets Workers talk to external Postgres / MySQL databases without paying per-request TCP handshake cost. Use Hyperdrive any time you need to query a regional Postgres/MySQL from Workers - direct connections from Workers are slow and burn your DB's connection limit.
 
 ### Core rules
 
 - **Do not cache the client in module scope.** Workers isolates are short-lived and globally distributed; a module-scope client leaks across isolates and breaks on cold starts. Create the client per request.
 - **Always close with `ctx.waitUntil(sql.end())`.** Closing inside the request path blocks the response. `waitUntil` lets the response return while the connection unwinds.
-- **Keep the in-Worker pool small.** `max: 5` or less per invocation — Hyperdrive itself is the real pool. Your Worker is just one client.
+- **Keep the in-Worker pool small.** `max: 5` or less per invocation - Hyperdrive itself is the real pool. Your Worker is just one client.
 - **Mark read-only queries.** Hyperdrive caches `SELECT` results when safe; queries with `SET` / writes / transactions are never cached. Use `cacheTtl` and `cacheTables` in the dashboard to tune.
 - **Never put DB credentials in `wrangler.toml` or code.** The connection string lives in the Hyperdrive config (set via `wrangler hyperdrive create` or dashboard). The binding only exposes `connectionString` at runtime.
 
@@ -673,7 +673,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const sql = postgres(env.HYPERDRIVE.connectionString, {
       max: 5,
-      fetch_types: false,   // skip type introspection — saves a round-trip per cold start
+      fetch_types: false,   // skip type introspection - saves a round-trip per cold start
     });
 
     try {
@@ -704,10 +704,10 @@ wrangler hyperdrive create my-db --connection-string="postgres://user:pass@host:
 
 ### Anti-patterns
 
-- Top-level `const sql = postgres(...)`. The client survives across requests in an isolate and across deployments unpredictably — connections leak.
+- Top-level `const sql = postgres(...)`. The client survives across requests in an isolate and across deployments unpredictably - connections leak.
 - `await sql.end()` before `return new Response(...)`. Blocks the response on connection teardown.
-- Connecting directly to Postgres from a Worker, bypassing Hyperdrive. Each request opens a fresh TCP+TLS connection — latency and connection-limit exhaustion follow.
-- Putting the connection string in `[vars]`. It is a credential — keep it in the Hyperdrive config, not in source-controlled config.
+- Connecting directly to Postgres from a Worker, bypassing Hyperdrive. Each request opens a fresh TCP+TLS connection - latency and connection-limit exhaustion follow.
+- Putting the connection string in `[vars]`. It is a credential - keep it in the Hyperdrive config, not in source-controlled config.
 
 ## Workers AI
 
@@ -717,9 +717,9 @@ Run inference on Cloudflare's GPU fleet from Workers. Bind the `AI` namespace an
 
 - **Set a timeout on every `AI.run`.** Model calls can hang; use `AbortSignal.timeout(15_000)` or similar and surface a fallback response.
 - **Stream long generations.** Set `stream: true` and pipe the `ReadableStream` directly into a `Response` with `content-type: text/event-stream`. Buffering a 4k-token response into memory burns CPU time and worsens TTFB.
-- **Route through AI Gateway.** Bind `[[ai]]` to a gateway slug — you get free request logging, response caching, retry, and per-model cost visibility. Bypassing the gateway means flying blind in production.
+- **Route through AI Gateway.** Bind `[[ai]]` to a gateway slug - you get free request logging, response caching, retry, and per-model cost visibility. Bypassing the gateway means flying blind in production.
 - **Pin the model version.** Use `@cf/meta/llama-3.3-70b-instruct`, not `@cf/meta/llama`. Model aliases shift and break prompts silently.
-- **Never trust model output.** Treat it as untrusted user input — sanitize before storing, escape before rendering, validate before passing to other systems.
+- **Never trust model output.** Treat it as untrusted user input - sanitize before storing, escape before rendering, validate before passing to other systems.
 
 ### Text generation
 
@@ -781,10 +781,10 @@ index_name = "kb-index"
 
 ### Anti-patterns
 
-- Calling `AI.run` inside a tight loop without `Promise.all`. Inference is the bottleneck — batch where the model supports it (embeddings) or fan out concurrently.
+- Calling `AI.run` inside a tight loop without `Promise.all`. Inference is the bottleneck - batch where the model supports it (embeddings) or fan out concurrently.
 - Returning raw model output as HTML. Always escape; LLMs can be prompt-injected into emitting `<script>` tags.
 - Re-embedding the same text on every request. Cache embeddings in KV / D1 / Vectorize keyed by a content hash.
-- Using `temperature: 0` and assuming determinism. Workers AI is not bit-for-bit deterministic across hardware — assume some variance even at temp 0.
+- Using `temperature: 0` and assuming determinism. Workers AI is not bit-for-bit deterministic across hardware - assume some variance even at temp 0.
 
 ## Vectorize
 
@@ -792,7 +792,7 @@ Managed vector database. Use for RAG, semantic search, recommendations, deduplic
 
 ### Core rules
 
-- **Dimension is fixed at index creation.** Match it to your embedding model (768 for bge-base-en-v1.5, 1024 for bge-large, 1536 for OpenAI text-embedding-3-small, 3072 for text-embedding-3-large). Cannot change after creation — wrong dimension means rebuilding the index.
+- **Dimension is fixed at index creation.** Match it to your embedding model (768 for bge-base-en-v1.5, 1024 for bge-large, 1536 for OpenAI text-embedding-3-small, 3072 for text-embedding-3-large). Cannot change after creation - wrong dimension means rebuilding the index.
 - **Declare metadata indexes upfront.** Filterable metadata fields must be configured at creation (or added later via `wrangler vectorize create-metadata-index`). Filtering on undeclared fields falls back to a full-index scan.
 - **Distance metric is fixed at creation.** `cosine` (default; what most embedding models target), `euclidean`, or `dot-product`. Match the model's training metric.
 - **`returnValues: false` is the default; keep it that way.** The vector itself is rarely useful downstream; metadata and id are. Returning values wastes bandwidth.
@@ -885,7 +885,7 @@ index_name = "kb-index"
 ### Anti-patterns
 
 - Creating the index with the wrong dimension. Wrong dimension means rebuilding from scratch later; double-check against the model's output shape before `wrangler vectorize create`.
-- Not declaring metadata indexes. Every filter that touches an undeclared field becomes a full-index scan — linear in corpus size, eventually unusable.
+- Not declaring metadata indexes. Every filter that touches an undeclared field becomes a full-index scan - linear in corpus size, eventually unusable.
 - Using a single global index for multi-tenant data without namespaces. Queries leak across tenants; performance degrades as the index grows.
 - Embedding the same content on every request. Hash the input, cache the vector id; only re-embed on content change.
 - Single-vector upserts in a loop. Batch to 1000 per call; the per-call overhead dominates otherwise.
@@ -893,7 +893,7 @@ index_name = "kb-index"
 
 ## AI Gateway
 
-A universal proxy in front of model providers (Workers AI, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, HuggingFace, Replicate, Bedrock, Vertex, etc.) that adds caching, retries, rate limiting, fallback chains, per-app analytics, audit logging, and prompt/response tracing. The Gateway works whether the caller is a Worker or an external app — it's a URL you POST to.
+A universal proxy in front of model providers (Workers AI, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, HuggingFace, Replicate, Bedrock, Vertex, etc.) that adds caching, retries, rate limiting, fallback chains, per-app analytics, audit logging, and prompt/response tracing. The Gateway works whether the caller is a Worker or an external app - it's a URL you POST to.
 
 ### Core rules
 
@@ -917,7 +917,7 @@ const result = await env.AI.run(
 
 ### Call from Node / Python via the universal endpoint
 
-The Gateway exposes a REST endpoint that mirrors the upstream provider's API exactly — drop-in replacement for the provider's URL.
+The Gateway exposes a REST endpoint that mirrors the upstream provider's API exactly - drop-in replacement for the provider's URL.
 
 ```bash
 # OpenAI through Gateway
@@ -933,7 +933,7 @@ curl https://gateway.ai.cloudflare.com/v1/<account-id>/<gateway-slug>/anthropic/
   -d '{"model":"claude-sonnet-4-5","max_tokens":1024,"messages":[{"role":"user","content":"hi"}]}'
 ```
 
-Same payload, same response shape, same SDK — just swap the base URL. The SDK call sites do not change.
+Same payload, same response shape, same SDK - just swap the base URL. The SDK call sites do not change.
 
 ### Fallback chain (dashboard-configured, but visible in the request)
 
@@ -975,6 +975,6 @@ const result = await env.AI.run(
 - Calling OpenAI / Anthropic directly when Gateway is available. You've lost observability, retries, fallback, caching, and per-app cost visibility for no upside.
 - Caching error responses. A transient 500 cached for an hour becomes a fake outage. Only cache 2xx; let errors hit the upstream every time so they fix themselves.
 - Aggressive TTL on chat completions. Stale completions reach users; trust degrades. Reserve caching for deterministic retrievals.
-- Gateway tokens checked into source control. Same rules as any API key — vault, CI secret, or `wrangler secret put`.
+- Gateway tokens checked into source control. Same rules as any API key - vault, CI secret, or `wrangler secret put`.
 - One gateway slug for ten unrelated apps. Use one slug per application so you can scope tokens, see per-app costs, and configure per-app caching independently.
-- Skipping the metadata tagging. Without `metadata.tenant_id` (or similar) the cost dashboard is a single undifferentiated total — you can't answer "which tenant drove this month's bill".
+- Skipping the metadata tagging. Without `metadata.tenant_id` (or similar) the cost dashboard is a single undifferentiated total - you can't answer "which tenant drove this month's bill".

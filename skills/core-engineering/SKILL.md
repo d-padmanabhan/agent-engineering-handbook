@@ -81,10 +81,10 @@ The agent (an LLM in Cursor / Claude / Codex / etc.) is a fast, persuasive, part
 
 **Where AI consistently misleads:**
 
-- Library versions and APIs — fabricates signatures, hallucinates deprecated methods, invents flags. Verify with `gh release view`, the actual `--help`, or the docs.
-- Current state of the world — "as of 2026" claims about pricing, SLAs, regulatory text, deprecation timelines. Verify or omit.
-- Domain reasoning — anything requiring business context the model wasn't trained on.
-- Security boundaries — auth, crypto, IAM policies, SQL with dynamic input, shell with user input. Read line-by-line, not skimmed.
+- Library versions and APIs - fabricates signatures, hallucinates deprecated methods, invents flags. Verify with `gh release view`, the actual `--help`, or the docs.
+- Current state of the world - "as of 2026" claims about pricing, SLAs, regulatory text, deprecation timelines. Verify or omit.
+- Domain reasoning - anything requiring business context the model wasn't trained on.
+- Security boundaries - auth, crypto, IAM policies, SQL with dynamic input, shell with user input. Read line-by-line, not skimmed.
 - File paths, commit hashes, line numbers, CVE ids. Verify before quoting.
 
 **Rules:**
