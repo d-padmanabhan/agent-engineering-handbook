@@ -120,6 +120,58 @@ See also: `316-zero-trust.mdc`, `318-workload-identity.mdc`, `412-aws-iam.mdc`.
 
 ---
 
+## OWASP Managed Ruleset configuration
+
+The Cloudflare OWASP Managed Ruleset is Cloudflare's hosted port of the OWASP ModSecurity Core Rule Set (CRS). Distinct from WAF Custom Rules: custom rules are your own expressions; the managed ruleset is Cloudflare-maintained signatures with two main configuration knobs.
+
+### Recommended starting configuration
+
+**Paranoia Level 1 (PL1) with anomaly score threshold of 60.** Per direct Cloudflare WAF expert recommendation. This is the Cloudflare default and the most permissive configuration; it is also the one with the lowest false-positive rate on real production traffic. Crank up only with evidence that PL1 is missing real attacks against your specific app, never speculatively.
+
+| Knob | Recommended | Notes |
+|---|---|---|
+| **Paranoia Level** | **PL1** | Lowest false-positive surface; rules tuned for general-purpose web apps. PL2-PL4 add increasingly aggressive rules; each step up generates substantially more false positives. |
+| **Anomaly Score Threshold** | **60** | Default for PL1. The score above which the configured action (block / managed challenge / log) fires. Lower thresholds mean more triggers and more false positives; higher thresholds mean attacks may slip through. |
+
+### Why this combination
+
+The OWASP CRS scores requests by summing the severity of matched rules. The threshold determines when that score triggers your action. PL1 plus threshold 60 is the calibration point where the false-positive rate is low enough to run in **block** mode on most apps without breaking legitimate traffic. Moving to PL2/3/4 *or* lowering the threshold below 60 typically requires per-rule overrides and a tuning iteration; teams that skip the tuning end up reverting to log-only mode within a sprint.
+
+### When to deviate
+
+Deviate only with evidence:
+
+| Situation | Change | Caveat |
+|---|---|---|
+| You have real attack traffic that PL1 + 60 lets through | Raise paranoia or lower threshold | Expect a wave of false positives; budget time for per-rule exclusions |
+| Highly regulated or high-value target (financial, healthcare, government) | Consider PL2 with threshold 40 | Pair with extensive per-rule exclusions; start in log-only mode, tune for 2-4 weeks, then enforce |
+| App generates legitimate traffic that looks like an attack (e.g., security tooling, code editors handling raw SQL) | Keep PL1 + 60; add **exclusions** for the specific rule IDs, not a global PL/threshold change | Targeted overrides keep the ruleset's protection elsewhere |
+
+### Rollout discipline
+
+1. **Always start in log-only mode** (action = `log`) for a minimum of one week.
+2. Review the WAF analytics; identify the top 10 rules by trigger count; investigate whether each is a true positive or a false positive in your context.
+3. Add per-rule exclusions for the legitimate-but-noisy patterns.
+4. Switch to **managed challenge** action; observe another week.
+5. Switch to **block** only after the challenge-pass rate is low (most challenges should fail; if humans are being challenged constantly, exclusions are still incomplete).
+6. Keep a rolling review: re-audit the top-triggered rules monthly; the attack surface drifts.
+
+### Anti-patterns
+
+- Enabling the managed ruleset on day one in **block** mode. Guarantees legitimate-traffic incidents; teams revert and turn the whole thing off.
+- Cranking paranoia to PL3 or PL4 because "more rules is safer". False-positive rate explodes; the WAF becomes operational noise; eventually disabled.
+- Lowering the anomaly threshold to 5 or 10 without per-rule exclusions. Same outcome as above.
+- Disabling the managed ruleset entirely to silence false positives instead of writing rule-level exclusions. Loses signature coverage for the entire OWASP CRS surface.
+- Treating WAF Custom Rules as a substitute for the managed ruleset. They serve different purposes: custom rules encode your specific policy; the managed ruleset catches the OWASP-CRS attack patterns you have not (and cannot reasonably) encode yourself. Use both.
+
+### See also
+
+- Cloudflare docs: [OWASP Managed Ruleset](https://developers.cloudflare.com/waf/managed-rules/reference/owasp-core-ruleset/)
+- Cloudflare docs: [Configure the OWASP Managed Ruleset](https://developers.cloudflare.com/waf/managed-rules/deploy-zone-dashboard/#configure-the-cloudflare-owasp-core-ruleset)
+- `310-security.mdc` OWASP Top 10 - the WAF catches a fraction; secure coding catches the rest
+
+---
+
 ## Quick Reference
 
 ### Essential Commands
