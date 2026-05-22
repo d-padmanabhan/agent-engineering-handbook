@@ -94,3 +94,40 @@ AWS managed policy reference: `https://docs.aws.amazon.com/aws-managed-policy/la
 ```bash
 jq -c . policy.json > policy.min.json
 ```
+
+## IMDS hardening for the underlying nodes
+
+EKS Pod Identity and IRSA replace IMDS for app-side credentials, but the worker nodes still run EC2 and the IMDS endpoint is still reachable from inside containers if you let it be. Treat IMDS at the node level as a separate hardening concern from credential delivery at the app level.
+
+Required on every EKS node group launch template:
+
+```hcl
+metadata_options {
+  http_endpoint               = "enabled"
+  http_tokens                 = "required"   # IMDSv2 only - never optional
+  http_put_response_hop_limit = 2            # 2 hops to traverse the container bridge; never default 64
+  instance_metadata_tags      = "enabled"
+}
+```
+
+Why `hop_limit = 2`:
+
+- A pod requesting IMDS traverses one hop into the CNI / kubelet, one hop to the node IMDS endpoint - 2 hops total.
+- The AWS default of 64 hops means any process inside any container (or any sidecar, or any process that escapes the container boundary) can reach IMDS. That defeats the entire reason Pod Identity / IRSA exist.
+- A hop limit of 1 silently breaks pod-to-IMDS resolution if any app does fall through to IMDS; debugging this is unpleasant. Pick 2 for EKS nodes, document the reasoning in the Terraform comment.
+
+Discipline:
+
+- **Apps should never read IMDS directly on EKS.** Use Pod Identity (preferred) or IRSA. The hop limit is the floor; the right mechanism is the OIDC-vended credential.
+- **Block IMDS from pod networking entirely** for hardest-tier workloads via a NetworkPolicy or eBPF rule denying `169.254.169.254/32`. Catches the case where an app library has IMDS fallback you didn't know about.
+- **Audit nightly** for nodes that drift to `http_tokens = "optional"`:
+
+  ```bash
+  aws ec2 describe-instances \
+    --filters "Name=metadata-options.http-tokens,Values=optional" \
+              "Name=tag:eks:cluster-name,Values=*" \
+    --query "Reservations[].Instances[].[InstanceId,Tags[?Key=='eks:cluster-name'].Value|[0]]" \
+    --output table
+  ```
+
+See `rules/410-aws.mdc` "Non-negotiable: IMDSv2 only" for the cross-cutting AWS rule, account-wide SCP / AWS Config enforcement, and the migration recipe for legacy instances.

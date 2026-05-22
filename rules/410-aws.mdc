@@ -854,6 +854,146 @@ spec:
 
 ## Security Best Practices
 
+### Non-negotiable: IMDSv2 only; IMDSv1 forbidden
+
+Every EC2 instance, every Launch Template, every Auto Scaling Group MUST require IMDSv2 (token-based) and reject IMDSv1 (unauthenticated GET). IMDSv1 is the SSRF surface that produced the Capital One 2019 breach (~$190M penalty). The cost of fixing this is one Terraform stanza per instance; the cost of not fixing it is unbounded.
+
+**Terraform (EC2 + Launch Template + ASG):**
+
+```hcl
+resource "aws_instance" "app" {
+  # ... ami, instance_type, subnet, etc ...
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"   # IMDSv2 only
+    http_put_response_hop_limit = 1            # 2 if running containers on EC2 directly
+    instance_metadata_tags      = "enabled"    # optional; surfaces instance tags via IMDS
+  }
+}
+
+resource "aws_launch_template" "app" {
+  # ... image_id, instance_type, etc ...
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+    instance_metadata_tags      = "enabled"
+  }
+}
+```
+
+**CloudFormation:**
+
+```yaml
+Resources:
+  AppInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateName: !Ref AppLaunchTemplate
+        Version: !GetAtt AppLaunchTemplate.LatestVersionNumber
+
+  AppLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+          InstanceMetadataTags: enabled
+```
+
+**AWS CLI (modify an existing instance):**
+
+```bash
+aws ec2 modify-instance-metadata-options \
+  --instance-id i-0abcdef1234567890 \
+  --http-tokens required \
+  --http-endpoint enabled \
+  --http-put-response-hop-limit 1
+```
+
+#### Hop limit reasoning
+
+`HttpPutResponseHopLimit` controls how many network hops the IMDS response can traverse.
+
+| Workload | Hop limit | Why |
+|---|---|---|
+| Bare metal / app runs directly on the host OS | **1** | Tightest; only the host kernel reaches IMDS |
+| Docker / containerd on EC2 with default bridge network | **2** | Container needs one hop through the bridge to reach IMDS |
+| EKS / ECS (containerized workloads) | **2** | Same as above; the kubelet / agent intercepts |
+| App that should NEVER reach IMDS | **1** (combined with IRSA / Pod Identity for cloud creds) | Best practice for EKS - see the IRSA / Pod Identity rule below |
+
+A hop limit too low silently breaks the container's credential resolution. A hop limit too high (default of 64) lets pods, sidecars, or escaped processes reach IMDS unintentionally - the original SSRF risk.
+
+#### For containerized workloads, prefer IRSA or Pod Identity over IMDS
+
+The right answer for EKS workloads is **not** "tune the hop limit so containers can read IMDS". The right answer is **don't read IMDS from app code at all**. Use one of:
+
+- **IRSA** (IAM Roles for Service Accounts) - OIDC-federated per-service-account credentials, vended via the AWS SDK without touching IMDS
+- **EKS Pod Identity** (the newer, preferred AWS-native approach) - per-pod credentials via a sidecar agent
+- **Workload Identity** equivalent on GKE / AKS
+
+The hop limit setting is the floor (limits blast radius if app code does reach IMDS); IRSA / Pod Identity is the actual mechanism (replaces IMDS for app-side credentials). See `rules/412-aws-iam.mdc` and `skills/aws-iam/references/eks-pod-identity-abac-and-lattice.md`.
+
+#### Account-wide enforcement
+
+Per-instance configuration is not enough. Enforce at the account / org level:
+
+**AWS Config managed rule (detection):**
+
+```bash
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "ec2-imdsv2-check",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "EC2_IMDSV2_CHECK"
+  }
+}'
+```
+
+This rule reports NON_COMPLIANT for any EC2 instance with `HttpTokens != "required"`. Wire it to an alarm.
+
+**SCP at the org level (prevention):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "DenyEC2LaunchWithoutIMDSv2",
+    "Effect": "Deny",
+    "Action": ["ec2:RunInstances", "ec2:CreateLaunchTemplate", "ec2:CreateLaunchTemplateVersion"],
+    "Resource": ["arn:aws:ec2:*:*:instance/*", "arn:aws:ec2:*:*:launch-template/*"],
+    "Condition": {
+      "StringNotEquals": {
+        "ec2:MetadataHttpTokens": "required"
+      }
+    }
+  }]
+}
+```
+
+#### Audit: find IMDSv1-permitting instances
+
+```bash
+aws ec2 describe-instances \
+  --filters "Name=metadata-options.http-tokens,Values=optional" \
+  --query "Reservations[].Instances[].[InstanceId,LaunchTime,Tags[?Key==\`Name\`].Value|[0]]" \
+  --output table
+```
+
+Anything that returns is non-compliant. Migrate with the `modify-instance-metadata-options` CLI above; verify with the same query returning empty.
+
+#### Anti-patterns
+
+- Leaving `http_tokens = "optional"` (the historical default in older Terraform / CloudFormation / SDKs). IMDSv1 still works alongside v2; the SSRF risk is unchanged.
+- Setting `HttpPutResponseHopLimit = 64` (the AWS default) "for compatibility". Pods, sidecars, and any escaped process can reach IMDS.
+- Allowing app code to read IMDS directly on EKS / ECS instead of using IRSA / Pod Identity. App secrets and role creds become a single SSRF away.
+- Auditing once after a security review and never again. Drift happens via custom AMIs, Auto Scaling Group launch templates pinned to old versions, and copy-pasted Terraform. Wire AWS Config + SCP and forget.
+
 ### Encryption
 
 **Encrypt everything:**

@@ -100,6 +100,33 @@ rg -n '/actuator|/debug/pprof|swagger-ui|/admin' -C1
 
 Disable debug in prod, scope IAM to least privilege, set security headers via middleware, lock down management endpoints behind auth + network ACLs.
 
+### AWS-specific misconfig: IMDSv1 enabled on EC2 instances
+
+Critical-severity misconfig that produced the Capital One 2019 breach (~$190M penalty). Every EC2 instance, Launch Template, and Auto Scaling Group MUST require IMDSv2.
+
+```bash
+# Audit: find any EC2 instance allowing IMDSv1
+aws ec2 describe-instances \
+  --filters "Name=metadata-options.http-tokens,Values=optional" \
+  --query "Reservations[].Instances[].[InstanceId,LaunchTime,Tags[?Key==\`Name\`].Value|[0]]" \
+  --output table
+
+# Remediate one instance
+aws ec2 modify-instance-metadata-options \
+  --instance-id i-0abcdef1234567890 \
+  --http-tokens required \
+  --http-endpoint enabled \
+  --http-put-response-hop-limit 1   # 2 for container-on-EC2 / EKS nodes
+
+# Enforce account-wide: AWS Config managed rule
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "ec2-imdsv2-check",
+  "Source": { "Owner": "AWS", "SourceIdentifier": "EC2_IMDSV2_CHECK" }
+}'
+```
+
+For Terraform / CloudFormation specifics, account-wide SCP enforcement, and the hop-limit reasoning (1 for bare metal vs 2 for containers), see `rules/410-aws.mdc` "Non-negotiable: IMDSv2 only" and `skills/aws-iam/references/eks-pod-identity-abac-and-lattice.md` "IMDS hardening for the underlying nodes".
+
 ---
 
 ## A06 - Vulnerable & Outdated Components
