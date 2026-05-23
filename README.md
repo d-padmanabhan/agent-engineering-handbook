@@ -474,6 +474,20 @@ Based on Cursor's docs:
   - **How they apply**: the agent can auto-select a relevant skill, or you can invoke it manually via `/skill-name`. You can force "manual only" by setting `disable-model-invocation: true`
   - **Best for**: repeatable multi-step playbooks (release, deploy, migration, audit, generating artifacts) and "do X end-to-end" flows
 
+### Practical comparison (the parts that bite in YAML)
+
+The bullets above orient; this table is the reference for "what do I put in the frontmatter, and what is it going to cost me at runtime?"
+
+| | Rules (`.mdc`) | Skills (`SKILL.md`) |
+|---|---|---|
+| **Frontmatter fields** | `title`, `description`, `priority`, `alwaysApply`, `files.include` | `name`, `description`, optionally `disable-model-invocation` |
+| **`alwaysApply` honored?** | Yes - core mechanism | **No** - not in the skills schema; silently ignored |
+| **Activation triggers** | `alwaysApply: true` (every conversation), `files.include` glob (when matching file opens), or agent-selected | Agent reads `description` and self-selects; user runs `/skill-name` |
+| **Cost of being "always on"** | A few hundred tokens per conversation - fine | Entire `SKILL.md` + references loaded per conversation - token explosion + agent confusion |
+| **How to get "always-on" semantics for skill-domain content** | Put the principles in a rule (with `alwaysApply: true`); leave the workflow in a skill. Many domains in this repo do both - `316-zero-trust.mdc` + `skills/zero-trust/`; `260-frontend.mdc` + `skills/frontend-engineering/`; `325-networking.mdc` + `skills/networking-transport/` | n/a (do not try) |
+
+Short answer to "should this skill have `alwaysApply: true`?": **no**. If the content needs to be loaded every conversation, lift the principles into a rule and keep the playbook in the skill.
+
 ## Skills shipped in this repo
 
 Skills under `skills/` cover repeatable end-to-end workflows that pair with the rules above. Cursor auto-selects them based on the SKILL.md `description:` triggers; invoke manually as `/<skill-name>` when needed.
