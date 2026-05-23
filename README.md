@@ -522,6 +522,7 @@ Skills under `skills/` cover repeatable end-to-end workflows that pair with the 
 - **[skills/documentation-standards](skills/documentation-standards/)** - Markdown + Mermaid + ADR patterns
 - **[skills/reactflow-architecture-diagrams](skills/reactflow-architecture-diagrams/)** - interactive React Flow architecture canvases
 - **[skills/single-file-dashboard](skills/single-file-dashboard/)** - zero-dependency single-file HTML dashboards (emailable / airgap-safe)
+- **[skills/pdf-export](skills/pdf-export/)** - client-side PDF export for web apps via `jspdf` + `html2canvas-pro` (single-element + multi-page with TOC); no server, no Puppeteer
 
 ### Workflow patterns (meta)
 
