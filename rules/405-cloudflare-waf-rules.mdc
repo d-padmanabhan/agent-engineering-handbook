@@ -73,8 +73,8 @@ Document the choice in the zone's README / runbook so the next on-call doesn't a
 
    | Pattern (purpose-based name) | Predicate shape | Use when |
    |---|---|---|
-   | `<app>-stcore-upload-file-skip` | host (set) + method `PUT` + `ip.src in $corp_egress_ips` + path prefix + multipart content-type + `filename=` body | Streamlit / file-uploader endpoints, multipart PUT, internal users |
-   | `<app>-workbook-upload-skip` | host eq + method `POST` + (geo OR corp) + path eq + multipart content-type + `filename=` body | Specific endpoint, browser POST, mixed-internet users |
+   | `<app>-stcore-upload-file-skip` | host (set) + method `PUT` + `ip.src in $trusted_egress_ips` + path prefix + multipart content-type + `filename=` body | Streamlit / file-uploader endpoints, multipart PUT, internal users |
+   | `<app>-workbook-upload-skip` | host eq + method `POST` + (geo OR trusted) + path eq + multipart content-type + `filename=` body | Specific endpoint, browser POST, mixed-internet users |
    | `<app>-file-upload-browser-skip` | host eq + method `POST` + path eq + multipart content-type + `filename=` body + `origin` header eq + `corp_egress_ips` | Specific browser endpoint, browser-only path requires origin pinning |
    | `<app>-api-multipart-skip` | host eq + method `POST` + path prefix + multipart content-type + `filename=` body | API-shaped multipart uploads, no browser context |
    | `<app>-dashboard-be-post-skip` | host eq + method `POST` + path prefix (broad API) | Server-to-server endpoint, no body inspection needed |
@@ -83,19 +83,19 @@ Document the choice in the zone's README / runbook so the next on-call doesn't a
 
    | Pattern family | Shape | Use when |
    |---|---|---|
-   | `block-non-corp-egress-ips` family | `block` action + host + path scope + `not (ip.src in $corp_egress_ips)` | Internal-only endpoint must be reachable only from corp egress |
-   | `allow-us-only-and-corp` family | `skip` action with high-priority allow + `(ip.geoip.country eq "US" or ip.src in $corp_egress_ips)` + host scope | Geo-restricted public-ish endpoint |
-   | `allow-<region>-and-corp` (e.g., US+CA, TW) | Same as above with extra country + corp escape hatch | Targeted regional rollouts; always add corp IPs as escape hatch |
+   | `block-non-trusted-egress-ips` family | `block` action + host + path scope + `not (ip.src in $trusted_egress_ips)` | Internal-only endpoint must be reachable only from trusted egress |
+   | `allow-us-only-and-trusted` family | `skip` action with high-priority allow + `(ip.geoip.country eq "US" or ip.src in $trusted_egress_ips)` + host scope | Geo-restricted public-ish endpoint |
+   | `allow-<region>-and-trusted` (e.g., US+CA, TW) | Same as above with extra country + trusted-IPs escape hatch | Targeted regional rollouts; always add trusted IPs as escape hatch |
    | `geo-block-OFAC` (continent or country list) | `block` action + `ip.geoip.country in {"CU" "IR" "KP" "RU" "SY"}` | OFAC sanctioned countries; never user-configurable, always block |
    | `attack-score-gate` (Enterprise) | `cf.waf.score le N` scoped to host/path | Sensitive paths; supplements managed rules, doesn't replace them |
 
-   For new custom rules: prefer **allow before block** (skip-allow rule positioned above the block rule) so the corp-egress escape hatch always wins ties.
+   For new custom rules: prefer **allow before block** (skip-allow rule positioned above the block rule) so the trusted-egress escape hatch always wins ties.
 
 3. **Confirm the request actually requires a skip.** Validate from the requester:
    - Ticket / change number, owner, business justification
    - The exact host(s), path(s), method(s), expected request shape
    - Whether the legitimate flow originates in a browser app (origin header pinning available) or server-to-server (it isn't)
-   - Whether the legitimate flow's source IPs are knowable (corp egress, named source set) or fully open (geo at most)
+   - Whether the legitimate flow's source IPs are knowable (trusted egress, named source set) or fully open (geo at most)
    - Which OWASP child-rule IDs are actually firing on the legitimate flow (from Security Events). Skip only those, not the whole ruleset.
 
 If any of the above is missing, **stop and ask** before drafting the rule. Do not invent guards or scope.
@@ -140,12 +140,12 @@ Custom rules implement *your* policy. Pick the action deliberately; over-blockin
 **Allow-before-block ordering (REQUIRED):**
 
 ```text
-1. allow-corp-egress-skip       (action = skip, expression: ip.src in $corp_egress_ips)
-2. allow-us-only-and-corp-skip  (action = skip, expression: country in allowlist OR corp)
-3. block-non-corp-egress-ips    (action = block, expression: rest)
+1. allow-trusted-egress-skip       (action = skip, expression: ip.src in $trusted_egress_ips)
+2. allow-us-only-and-trusted-skip  (action = skip, expression: country in allowlist OR trusted IPs)
+3. block-non-trusted-egress-ips    (action = block, expression: rest)
 ```
 
-The escape hatch (corp IPs) wins every tie because it's evaluated first. Inverting this order is a self-DoS waiting to happen.
+The escape hatch (trusted IPs) wins every tie because it's evaluated first. Inverting this order is a self-DoS waiting to happen.
 
 ---
 
@@ -155,19 +155,19 @@ Every skip rule MUST include the guards in its row, plus the standard host + met
 
 | Exception type | Required guards (in addition to host + method) |
 |---|---|
-| **Multipart file upload** | `any(lower(http.request.headers["content-type"][*])[*] contains "multipart/form-data")` AND `http.request.body.raw contains "filename="` AND scoped source (corp IPs, geo, or origin header) |
-| **Browser-app POST (specific endpoint)** | `any(http.request.headers["origin"][*] eq "https://<browser-app-host>")` AND scoped source (corp IPs or geo) |
-| **Server-to-server POST** | scoped source (corp IPs OR a named ASN / IP set). Origin header guard is meaningless here - do not use. |
+| **Multipart file upload** | `any(lower(http.request.headers["content-type"][*])[*] contains "multipart/form-data")` AND `http.request.body.raw contains "filename="` AND scoped source (trusted IPs, geo, or origin header) |
+| **Browser-app POST (specific endpoint)** | `any(http.request.headers["origin"][*] eq "https://<browser-app-host>")` AND scoped source (trusted IPs or geo) |
+| **Server-to-server POST** | scoped source (trusted IPs OR a named ASN / IP set). Origin header guard is meaningless here - do not use. |
 | **Streamlit / file-uploader endpoint** | path prefix with trailing slash + multipart guards above. Streamlit uses `/_stcore/upload_file/<uuid>`. |
-| **Geo-only allow** | `(ip.geoip.continent in {"NA"} or ip.src in $corp_egress_ips)` style - never bare geo without corp escape hatch. |
+| **Geo-only allow** | `(ip.geoip.continent in {"NA"} or ip.src in $trusted_egress_ips)` style - never bare geo without trusted-IPs escape hatch. |
 
 ## Required guards - Custom Rules (action = block / challenge / etc.)
 
 | Custom rule type | Required guards |
 |---|---|
-| **Geo allowlist (block-by-default)** | Country / continent predicate AND corp-egress escape hatch (`ip.src in $corp_egress_ips`). Never block based purely on geo - corp employees travel. |
+| **Geo allowlist (block-by-default)** | Country / continent predicate AND trusted-egress escape hatch (`ip.src in $trusted_egress_ips`). Never block based purely on geo - internal users travel. |
 | **OFAC / sanctioned-country block** | `ip.geoip.country in {"CU" "IR" "KP" "RU" "SY"}` (literal list, never variable). No escape hatch - this is a compliance block, not a policy choice. |
-| **Endpoint allowlist (specific path → specific source)** | host eq + path predicate (eq / starts_with per matrix) + source predicate (corp IPs, named source set, or geo). Use `skip` action positioned above the deny rule. |
+| **Endpoint allowlist (specific path → specific source)** | host eq + path predicate (eq / starts_with per matrix) + source predicate (trusted IPs, named source set, or geo). Use `skip` action positioned above the deny rule. |
 | **Attack-score gate (Enterprise plan)** | host + path scope + `cf.waf.score le N` (per `400-cloudflare.mdc` § "WAF Attack Score (Plan-Aware)"). Never gate globally on raw score; always combine with host / path / method. |
 | **Bot / ASN block** | `ip.geoip.asnum in {<list>}` OR `cf.client.bot` predicate. Document the ASN owner and the incident that justified the block. |
 
@@ -176,7 +176,7 @@ Every skip rule MUST include the guards in its row, plus the standard host + met
 - **`lower(...)` + `any(...)` content-type normalization** - request `content-type` is a multi-value header (`headers["content-type"][*]`). `any(...)[*] contains "multipart/form-data"` matches any value, lowercased, which handles `Multipart/Form-Data`, `multipart/form-data; boundary=...`, etc. This is the canonical form. Inventing a single-value `eq` check is wrong.
 - **`filename=` body marker** - narrows the skip to actual file uploads, rejects POSTs with multipart content-type but no file part. Cheap, unambiguous, defends against tooling that mis-sets content-type.
 - **`origin` header bracket + wildcard + `eq`** - `any(http.request.headers["origin"][*] eq "https://...")`. The `[*]` wildcard handles missing-or-multi-valued origin (browser sends one; some tooling sends none or multiple). Plain `http.request.headers["origin"] eq "..."` is wrong syntax - it's a multi-value field. Pinning to the browser app's own origin defeats forged-content-type server-to-server POSTs riding the skip.
-- **`ip.src in $corp_egress_ips`** - the named list is maintained centrally. Hardcoding IPs is forbidden - use the list reference.
+- **`ip.src in $trusted_egress_ips`** - the named list is maintained centrally. Hardcoding IPs is forbidden - use the list reference.
 - **OWASP child-rule list (the multipart baseline)** - shared by every multipart upload skip in the managed-rules file. Adding a new ID requires per-incident justification from the requester (example: an incident extending the baseline by one rule ID like `3ecd29ca…` should record *why* in the rule's inline comment). Do not invent.
 
 ---
@@ -187,11 +187,11 @@ The `description` is what the rule *does*. It shows up in the Cloudflare Dashboa
 
 | Shape | Example | Notes |
 |---|---|---|
-| OK - purpose-based | `internal-app-analyze-contract-multipart-skip` | What it does + which host / endpoint + that it's a skip |
-| OK - app + endpoint | `internal-app-stcore-upload-skip` | When the host is the app's identity |
-| OK - endpoint + scope | `internal-api-multipart-upload-skip` | When several apps share the endpoint |
-| Avoid - ticket-prefixed (Terraform) | `INC-XXXXXXXX-INC-YYYYYYYY-...` | When you have an inline comment block, the `description` is for meaning, not provenance - put the ticket in the comment. |
-| Tradeoff - ticket-suffixed (Dashboard / API) | `internal-app-multipart-upload-skip \| CHG-12345` | Dashboard / API have no inline-comment field. Either (a) suffix the ticket here, or (b) maintain a separate runbook that maps rule descriptions to tickets. Pick one per zone; document it. |
+| OK - purpose-based | `<your-app>-<endpoint>-multipart-skip` | What it does + which host / endpoint + that it's a skip |
+| OK - app + endpoint | `<your-app>-<endpoint>-upload-skip` | When the host is the app's identity |
+| OK - endpoint + scope | `<your-api>-multipart-upload-skip` | When several apps share the endpoint |
+| Avoid - ticket-prefixed (Terraform) | `<ticket-id-1>-<ticket-id-2>-...` | When you have an inline comment block, the `description` is for meaning, not provenance - put the ticket in the comment. |
+| Tradeoff - ticket-suffixed (Dashboard / API) | `<your-app>-<endpoint>-skip \| <ticket-id>` | Dashboard / API have no inline-comment field. Either (a) suffix the ticket here, or (b) maintain a separate runbook that maps rule descriptions to tickets. Pick one per zone; document it. |
 | Avoid - generic | `firewall-skip` / `bypass-rule` | Tells future you nothing |
 
 If the rule was raised against multiple tickets, list them in the provenance artifact for the interface you're using (Terraform comment, Dashboard runbook, or API JSON metadata), not the `description`.
@@ -208,7 +208,7 @@ Inline comment block immediately above the rule resource, in HCL `//` syntax:
 // <ticket id> - <host> `<path>` <method> <traffic shape>. <Peer-rule cross-reference: e.g. "Same shape as <peer-rule-name>">.
 //
 // Why each guard:
-//   - <origin / corp-IPs / etc>: <one-sentence justification>
+//   - <origin / trusted-IPs / etc>: <one-sentence justification>
 //   - <path predicate choice>: <eq vs starts_with vs alternation, with reason>
 //   - <OWASP child-rule list lineage>: <e.g. "shared baseline from <peer-rule-name>">
 //
@@ -233,7 +233,7 @@ The Dashboard's **Audit Logs** capture *who changed what when*, but not *why* - 
 
 JSON payloads don't carry comments either. Two options - pick one and document it:
 
-1. **Repo-resident JSON** (recommended): commit the JSON payload to a Git repo, with a sibling `.md` file alongside each rule (e.g., `rules/internal-app-multipart-upload-skip.json` + `rules/internal-app-multipart-upload-skip.md`). The `.md` is the provenance block (same fields as Terraform). The PR review enforces it.
+1. **Repo-resident JSON** (recommended): commit the JSON payload to a Git repo, with a sibling `.md` file alongside each rule (e.g., `rules/<your-app>-<endpoint>-skip.json` + `rules/<your-app>-<endpoint>-skip.md`). The `.md` is the provenance block (same fields as Terraform). The PR review enforces it.
 2. **Inline JSON metadata** (lossy): add an unofficial `_metadata` key to your local JSON before stripping it at apply-time. Cloudflare's API ignores unknown top-level fields *today*, but this is undocumented behavior - do not rely on it for production rules.
 
 Either way, the `description` field carries the purpose-based name (and optionally the ticket suffix).
@@ -251,7 +251,7 @@ These have all shown up in past WAF PRs (observed in the wild). If you see one, 
 
 1. **`starts_with(http.request.uri.path, "/api/x")` without trailing slash** - matches sibling paths like `/api/x-export`. Either add the trailing slash or use `eq`.
 2. **Title-vs-code drift** - in Terraform: PR title says "broaden" but code says `eq`. In Dashboard: change-ticket says "broaden" but the saved rule uses `eq`. In API: PR description for the JSON payload says "broaden" but the JSON says `eq`. All four sources of truth (title, body, provenance artifact, code / payload / saved rule) must agree.
-3. **Hardcoded IPs** instead of `$corp_egress_ips` (or its API equivalent: a named [IP List](https://developers.cloudflare.com/waf/tools/lists/)). The named list is centrally maintained; hardcoding stale IPs is how you DoS yourself in six months.
+3. **Hardcoded IPs** instead of `$trusted_egress_ips` (or its API equivalent: a named [IP List](https://developers.cloudflare.com/waf/tools/lists/)). The named list is centrally maintained; hardcoding stale IPs is how you DoS yourself in six months.
 4. **Plain `http.request.headers["X"] eq "..."`** - wrong syntax for a multi-value header field. Use `any(http.request.headers["X"][*] eq "...")`.
 5. **Single-value content-type check** - `http.request.headers["content-type"] eq "multipart/form-data"` is wrong syntax and wrong semantics (header is multi-value, may include `; boundary=...`). Use `any(lower(http.request.headers["content-type"][*])[*] contains "multipart/form-data")`.
 6. **Outer parens wrapping a top-level `and` chain** - `(a and b and c)`. The parens are a no-op; remove them for readability.
@@ -270,7 +270,7 @@ These have all shown up in past WAF PRs (observed in the wild). If you see one, 
 ### Custom Rules only
 
 12. **Block rule placed BEFORE the corresponding allow-skip rule** - the block fires first, the allow never gets a chance. Allow-before-block ordering is non-negotiable.
-13. **Geo block without corp-egress escape hatch** - blocks legitimate users in transit. Always include `or ip.src in $corp_egress_ips` (or equivalent named source list).
+13. **Geo block without trusted-egress escape hatch** - blocks legitimate users in transit. Always include `or ip.src in $trusted_egress_ips` (or equivalent named source list).
 14. **`js_challenge` on `/api/*` paths** - breaks API and CLI clients. Use `managed_challenge` for ambiguous traffic, or scope the rule to non-API paths.
 15. **Country-code typos** - country lists like `{"US" "CA" "MX" "GB"}` are case-sensitive ISO-3166 alpha-2. Always paste from the [Cloudflare country code reference](https://developers.cloudflare.com/network/country-codes/), never type from memory.
 
@@ -312,7 +312,7 @@ These have all shown up in past WAF PRs (observed in the wild). If you see one, 
 - [ ] All four sources of truth agree (PR / ticket title, PR / ticket body, provenance artifact, saved rule / code / JSON)
 - [ ] Multi-value headers use `any(... [*] ...)` form (not bare `eq`)
 - [ ] Content-type guard (where used) uses `any(lower(...)[*] contains ...)` form
-- [ ] No hardcoded IPs - `$corp_egress_ips` / a named IP List referenced
+- [ ] No hardcoded IPs - `$trusted_egress_ips` / a named IP List referenced
 - [ ] No outer parens wrapping the top-level `and` chain
 - [ ] Action choice is documented in the provenance artifact (why `block` vs `managed_challenge` vs `skip`)
 - [ ] Provenance artifact present and complete (ticket, peer cross-reference, per-guard rationale, approval source, review-by date)
@@ -329,7 +329,7 @@ These have all shown up in past WAF PRs (observed in the wild). If you see one, 
 ### Custom Rules only
 
 - [ ] Allow-before-block ordering preserved (skip-allow rules positioned ABOVE block rules)
-- [ ] Geo blocks include corp-egress escape hatch (unless OFAC compliance block, which doesn't)
+- [ ] Geo blocks include trusted-egress escape hatch (unless OFAC compliance block, which doesn't)
 - [ ] No `js_challenge` on `/api/*` paths
 - [ ] Country codes copy-pasted from Cloudflare reference, not typed
 
