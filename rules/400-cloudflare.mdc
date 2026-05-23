@@ -1681,6 +1681,9 @@ This section captures operational guidance for managed rules, attack score tunin
 
 Managed-rule exceptions are one of the riskiest things you can write in a WAF. Too broad and you silently disable signature coverage you paid for; too narrow and the false positive returns under slightly different load. The discipline below is non-negotiable for any production exception.
 
+> [!NOTE]
+> When you're editing the actual `cloudflare_ruleset` Terraform file, also load **[405-cloudflare-waf-rules.mdc](405-cloudflare-waf-rules.mdc)** for the Terraform-level tactical playbook (path predicate matrix, multi-value header syntax, required guards by exception type, naming + inline-comment shape, reviewer checklist). This section is the policy-level discipline; `405` is the implementation-level discipline.
+
 #### Before you write the exception (mandatory)
 
 1. **Read Cloudflare's current docs for the specific rule ID(s) you intend to override.** Action semantics (`skip` vs `log` vs `force` vs `set sensitivity`), default sensitivity, the rule's category, and the ruleset version your zone is on - these all change. Static repo content cannot keep current.

@@ -38,7 +38,8 @@ Comprehensive, battle-tested configuration for AI coding agents. Curated **rules
 - **[410-aws.mdc](rules/410-aws.mdc)** - AWS (EKS, VPC Lattice, Zero Trust, IAM)
 - **[430-azure.mdc](rules/430-azure.mdc)** - Azure (Bicep, Key Vault, App Service)
 - **[420-gcp.mdc](rules/420-gcp.mdc)** - GCP (Cloud Run, GKE, Secret Manager)
-- **[400-cloudflare.mdc](rules/400-cloudflare.mdc)** - Cloudflare (Workers, Rules Engine)
+- **[400-cloudflare.mdc](rules/400-cloudflare.mdc)** - Cloudflare (Workers, Rules Engine, WAF policy)
+- **[405-cloudflare-waf-rules.mdc](rules/405-cloudflare-waf-rules.mdc)** - Cloudflare WAF rule tactical playbook for Terraform / Dashboard / API authoring (source-of-truth discipline, predicates, guards, per-interface provenance + checklist)
 
 ### AI & Machine Learning
 

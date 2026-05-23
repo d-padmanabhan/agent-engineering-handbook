@@ -1,0 +1,374 @@
+---
+title: Cloudflare WAF Rules (Custom + Managed-Exception)
+description: Tactical playbook for authoring or reviewing Cloudflare WAF rules across all three authoring interfaces - Terraform (cloudflare_ruleset), the Cloudflare Dashboard, and the Rulesets API. Covers both Custom Rules (phase http_request_firewall_custom) and Managed-Rule Exceptions / skip rules (phase http_request_firewall_managed). Verify Cloudflare docs first, mirror peer-rule shape, narrow the blast radius, document the rationale, prevent source-of-truth drift. Loads automatically when editing Cloudflare ruleset files (Terraform / JSON); for Dashboard / API work, invoke explicitly or self-select via topic.
+priority: 405
+alwaysApply: false
+files:
+  include:
+    - "**/cloudflare*ruleset*.tf"
+    - "**/cloudflare*custom*rule*.tf"
+    - "**/cloudflare*managed*rule*.tf"
+    - "**/*-custom-rules.tf"
+    - "**/*-managed-rules.tf"
+    - "**/waf/*.tf"
+    - "**/waf-rules/*.tf"
+    - "**/cloudflare/**/*ruleset*.json"
+    - "**/cloudflare/**/waf-*.json"
+    - "**/waf/*.json"
+    - "**/waf-rules/*.json"
+---
+
+# Cloudflare WAF Rules (Custom + Managed-Exception)
+
+**Audience:** anyone authoring or reviewing a Cloudflare WAF rule, regardless of interface:
+
+- **Terraform** (`cloudflare_ruleset` resource) - HCL committed to a repo, applied via `terraform apply` / CI.
+- **Cloudflare Dashboard** - UI clicks under Security → WAF → Custom rules or Managed rules → Exceptions.
+- **Rulesets API** - direct JSON `PUT` / `POST` against `https://api.cloudflare.com/client/v4/zones/<zone_id>/rulesets/...`.
+
+The rule covers both phases:
+
+- phase `http_request_firewall_custom` (custom rules) - actions like `block`, `challenge`, `managed_challenge`, `js_challenge`, `log`, `skip`. These are *your* policy.
+- phase `http_request_firewall_managed` (managed-rule exceptions) - action `skip` only, bypassing OWASP / Cloudflare-managed signatures. Every one of these is a deliberate hole.
+
+**Relationship to `400-cloudflare.mdc`:** `400` is the broad Cloudflare platform playbook (Workers, Access, AOP, OWASP managed-ruleset configuration with PL1 + anomaly score threshold 60, the policy-level managed-rule exception discipline). This file is the tactical playbook you load when actually authoring the rule - in HCL, in the UI, or as a JSON payload. Use both together.
+
+**Why this rule exists:** A loose predicate, a missing guard, or a name that hides intent ships the same risk regardless of authoring path - blocking legitimate traffic (custom rule bug) or silently bypassing managed signatures (skip rule bug). The substance (predicates, guards, naming, anti-patterns) is interface-independent; only the *delivery mechanics* differ (HCL vs UI vs JSON) and the *change-management mechanics* differ (Git PR vs change ticket + audit log vs API call + recorded runbook entry). This rule encodes the patterns observed in past WAF PR reviews that have shipped clean, and the failure modes that have shown up repeatedly.
+
+> [!IMPORTANT]
+> The pre-edit gate, path predicate matrix, multi-value header syntax requirements, four-sources-of-truth rule, naming convention, required guards, and most anti-patterns apply **regardless of interface**. The "Provenance + rationale" and "Reviewer checklist" sections call out per-interface differences explicitly.
+
+## Source-of-truth discipline (NON-NEGOTIABLE)
+
+> [!CAUTION]
+> Pick **one** authoring path per zone and document it. Mixing Terraform + Dashboard + API authoring against the same zone produces drift that breaks `terraform plan`, silently overrides peer review, and makes incident rollback ambiguous.
+
+| If your zone is managed by | Then... |
+|---|---|
+| **Terraform** (most common for production zones) | All rules go through Git PR + `terraform apply`. Dashboard / API are **read-only** except for break-glass emergencies. Any emergency edit must be ported back to Terraform within 24h, with the PR referencing the emergency change ticket. |
+| **Dashboard** (small teams, lower-risk zones) | All rules go through the UI. Maintain a runbook (Confluence / ServiceNow / repo doc) that maps every rule's `description` to its change ticket, justification, and review date. The Dashboard's Audit Logs are your only built-in history. |
+| **API** (programmatic / GitOps-lite) | All rules go through a versioned JSON repo + a wrapper script that records changes. Treat the JSON file in Git the same way you'd treat HCL: PR review, soak in log mode, then promote. |
+
+Document the choice in the zone's README / runbook so the next on-call doesn't accidentally drift it.
+
+---
+
+## Pre-edit gate (NON-NEGOTIABLE)
+
+> [!IMPORTANT]
+> Before writing or editing any rule with `action = "skip"`, complete steps 1-3 below. Skipping this gate is a critical review finding.
+
+1. **Read the Cloudflare authoritative docs (do not rely on training-data memory):**
+   - [Add an exception via API](https://developers.cloudflare.com/waf/managed-rules/waf-exceptions/define-api/) - confirms `action: skip`, `action_parameters` shape, and the must-be-positioned-before-execute-rule rule.
+   - [Create an exception (Ruleset Engine)](https://developers.cloudflare.com/ruleset-engine/managed-rulesets/create-exception/) - the four exception types (`ruleset: current`, `rulesets: [...]`, `rules: { id: [...] }`).
+   - [WAF Managed Rules configuration using Terraform](https://developers.cloudflare.com/terraform/additional-configurations/waf-managed-rulesets/) - canonical Terraform shape.
+   - [Ruleset Engine fields reference](https://developers.cloudflare.com/ruleset-engine/rules-language/fields/) - confirm exact field names (`http.request.uri.path`, `http.request.headers["..."][*]`, `ip.src`, etc.).
+   - When the exception involves attack patterns (multipart, JSON, etc.), also read the relevant [OWASP Managed Ruleset](https://developers.cloudflare.com/waf/managed-rules/reference/owasp-core-ruleset/) reference for the rule IDs being skipped.
+   - Note any change to the API or Terraform provider since the rules in this file were last touched (use the [WAF changelog](https://developers.cloudflare.com/waf/change-log/) and [Cloudflare Terraform changelog](https://github.com/cloudflare/terraform-provider-cloudflare/blob/master/CHANGELOG.md)).
+   - If the workspace has the `user-cloudflare-docs` MCP server configured, prefer that for fresh fetches over training-data memory.
+
+2. **Survey the peer rules in the same zone.** The closest existing rule to your use case is your reference shape. Mirror it line-for-line; do not invent a new pattern unless the case genuinely demands it (and document why in your provenance artifact). Use the carrier appropriate to your interface: in Terraform, scan the rules in the same `.tf` file; in Dashboard, scan the rules listed for the phase + zone in the UI; in API, `GET` the current ruleset JSON and grep it.
+
+   ### Canonical shapes for managed-rule exceptions (skip rules)
+
+   | Pattern (purpose-based name) | Predicate shape | Use when |
+   |---|---|---|
+   | `<app>-stcore-upload-file-skip` | host (set) + method `PUT` + `ip.src in $corp_egress_ips` + path prefix + multipart content-type + `filename=` body | Streamlit / file-uploader endpoints, multipart PUT, internal users |
+   | `<app>-workbook-upload-skip` | host eq + method `POST` + (geo OR corp) + path eq + multipart content-type + `filename=` body | Specific endpoint, browser POST, mixed-internet users |
+   | `<app>-file-upload-browser-skip` | host eq + method `POST` + path eq + multipart content-type + `filename=` body + `origin` header eq + `corp_egress_ips` | Specific browser endpoint, browser-only path requires origin pinning |
+   | `<app>-api-multipart-skip` | host eq + method `POST` + path prefix + multipart content-type + `filename=` body | API-shaped multipart uploads, no browser context |
+   | `<app>-dashboard-be-post-skip` | host eq + method `POST` + path prefix (broad API) | Server-to-server endpoint, no body inspection needed |
+
+   ### Canonical shapes for custom rules
+
+   | Pattern family | Shape | Use when |
+   |---|---|---|
+   | `block-non-corp-egress-ips` family | `block` action + host + path scope + `not (ip.src in $corp_egress_ips)` | Internal-only endpoint must be reachable only from corp egress |
+   | `allow-us-only-and-corp` family | `skip` action with high-priority allow + `(ip.geoip.country eq "US" or ip.src in $corp_egress_ips)` + host scope | Geo-restricted public-ish endpoint |
+   | `allow-<region>-and-corp` (e.g., US+CA, TW) | Same as above with extra country + corp escape hatch | Targeted regional rollouts; always add corp IPs as escape hatch |
+   | `geo-block-OFAC` (continent or country list) | `block` action + `ip.geoip.country in {"CU" "IR" "KP" "RU" "SY"}` | OFAC sanctioned countries; never user-configurable, always block |
+   | `attack-score-gate` (Enterprise) | `cf.waf.score le N` scoped to host/path | Sensitive paths; supplements managed rules, doesn't replace them |
+
+   For new custom rules: prefer **allow before block** (skip-allow rule positioned above the block rule) so the corp-egress escape hatch always wins ties.
+
+3. **Confirm the request actually requires a skip.** Validate from the requester:
+   - Ticket / change number, owner, business justification
+   - The exact host(s), path(s), method(s), expected request shape
+   - Whether the legitimate flow originates in a browser app (origin header pinning available) or server-to-server (it isn't)
+   - Whether the legitimate flow's source IPs are knowable (corp egress, named source set) or fully open (geo at most)
+   - Which OWASP child-rule IDs are actually firing on the legitimate flow (from Security Events). Skip only those, not the whole ruleset.
+
+If any of the above is missing, **stop and ask** before drafting the rule. Do not invent guards or scope.
+
+---
+
+## Path predicate decision matrix
+
+This is the most-litigated decision in WAF reviews. Use this matrix; document the choice in the inline comment.
+
+| Choice | Use when | Bypass surface | Notes |
+|---|---|---|---|
+| `http.request.uri.path eq "/api/x"` | The legitimate flow is **only** the bare endpoint, requester confirmed | Narrowest | Future child paths under `/api/x/*` continue to be evaluated by OWASP - this is a defense-in-depth feature, not a coverage gap. Use this by default. |
+| `starts_with(http.request.uri.path, "/api/x/")` (with trailing slash) | Many child paths under `/api/x/` are legitimate (e.g., Streamlit `/_stcore/upload_file/<id>`) | Broad - covers all sub-paths | Always include the trailing slash to avoid matching `/api/x-export`, `/api/x-v2` siblings. |
+| `(eq "/api/x" or starts_with("/api/x/"))` (alternation) | Both bare endpoint AND child paths are legitimate | Broad + bare | Use when the requester explicitly wants both. |
+| `starts_with(http.request.uri.path, "/api/x")` (no trailing slash) | **NEVER** | Accidentally broad | Matches `/api/x-export`, `/api/x-v2`, `/api/xrelease`. This is a known anti-pattern - reject in review. |
+
+> [!CAUTION]
+> Title, body, provenance artifact, and the saved rule expression must all agree on the predicate shape. Past changes have had to be redone when the title said "broaden" but the saved expression used `eq`. Treat all four as a single source of truth - update them together or don't update at all.
+>
+> Per-interface mapping:
+>
+> - **Terraform:** PR title + PR body + HCL `//` comment + the expression in HCL.
+> - **Dashboard:** change ticket title + change ticket body + runbook entry + the expression in the UI's expression editor.
+> - **API:** PR title + PR body in the JSON repo + the sibling `.md` provenance file + the `expression` field in the JSON.
+
+---
+
+## Action choice - Custom Rules
+
+Custom rules implement *your* policy. Pick the action deliberately; over-blocking is the most common production incident.
+
+| Action | When to use | Risk if wrong |
+|---|---|---|
+| `skip` (allow) | Allowing trusted sources past a stricter downstream rule. **Always position above the block rule it complements.** | Skip placed *after* the block has no effect (Cloudflare evaluates top-down). |
+| `block` | Hard deny - geo-restricted, OFAC sanctioned, known-bad ASN | Blocks legitimate users when predicate is too broad |
+| `managed_challenge` | Suspicious-but-not-certain traffic; lets browsers solve, blocks bots | Most user-friendly enforcement; preferred over `block` for ambiguous cases |
+| `js_challenge` | Bot-suspected traffic from non-browser clients | Breaks API / CLI clients - never use on `/api/*` paths |
+| `challenge` | Legacy interactive challenge | Prefer `managed_challenge` - same UX, better detection |
+| `log` | Validate a predicate before enforcing | **Required first step** for every new block-class rule. Stage in log for at least 24h before promoting. |
+
+**Allow-before-block ordering (REQUIRED):**
+
+```text
+1. allow-corp-egress-skip       (action = skip, expression: ip.src in $corp_egress_ips)
+2. allow-us-only-and-corp-skip  (action = skip, expression: country in allowlist OR corp)
+3. block-non-corp-egress-ips    (action = block, expression: rest)
+```
+
+The escape hatch (corp IPs) wins every tie because it's evaluated first. Inverting this order is a self-DoS waiting to happen.
+
+---
+
+## Required guards - Managed-Rule Exceptions (action = skip)
+
+Every skip rule MUST include the guards in its row, plus the standard host + method.
+
+| Exception type | Required guards (in addition to host + method) |
+|---|---|
+| **Multipart file upload** | `any(lower(http.request.headers["content-type"][*])[*] contains "multipart/form-data")` AND `http.request.body.raw contains "filename="` AND scoped source (corp IPs, geo, or origin header) |
+| **Browser-app POST (specific endpoint)** | `any(http.request.headers["origin"][*] eq "https://<browser-app-host>")` AND scoped source (corp IPs or geo) |
+| **Server-to-server POST** | scoped source (corp IPs OR a named ASN / IP set). Origin header guard is meaningless here - do not use. |
+| **Streamlit / file-uploader endpoint** | path prefix with trailing slash + multipart guards above. Streamlit uses `/_stcore/upload_file/<uuid>`. |
+| **Geo-only allow** | `(ip.geoip.continent in {"NA"} or ip.src in $corp_egress_ips)` style - never bare geo without corp escape hatch. |
+
+## Required guards - Custom Rules (action = block / challenge / etc.)
+
+| Custom rule type | Required guards |
+|---|---|
+| **Geo allowlist (block-by-default)** | Country / continent predicate AND corp-egress escape hatch (`ip.src in $corp_egress_ips`). Never block based purely on geo - corp employees travel. |
+| **OFAC / sanctioned-country block** | `ip.geoip.country in {"CU" "IR" "KP" "RU" "SY"}` (literal list, never variable). No escape hatch - this is a compliance block, not a policy choice. |
+| **Endpoint allowlist (specific path → specific source)** | host eq + path predicate (eq / starts_with per matrix) + source predicate (corp IPs, named source set, or geo). Use `skip` action positioned above the deny rule. |
+| **Attack-score gate (Enterprise plan)** | host + path scope + `cf.waf.score le N` (per `400-cloudflare.mdc` § "WAF Attack Score (Plan-Aware)"). Never gate globally on raw score; always combine with host / path / method. |
+| **Bot / ASN block** | `ip.geoip.asnum in {<list>}` OR `cf.client.bot` predicate. Document the ASN owner and the incident that justified the block. |
+
+### Why each guard exists (cite this in your inline comment)
+
+- **`lower(...)` + `any(...)` content-type normalization** - request `content-type` is a multi-value header (`headers["content-type"][*]`). `any(...)[*] contains "multipart/form-data"` matches any value, lowercased, which handles `Multipart/Form-Data`, `multipart/form-data; boundary=...`, etc. This is the canonical form. Inventing a single-value `eq` check is wrong.
+- **`filename=` body marker** - narrows the skip to actual file uploads, rejects POSTs with multipart content-type but no file part. Cheap, unambiguous, defends against tooling that mis-sets content-type.
+- **`origin` header bracket + wildcard + `eq`** - `any(http.request.headers["origin"][*] eq "https://...")`. The `[*]` wildcard handles missing-or-multi-valued origin (browser sends one; some tooling sends none or multiple). Plain `http.request.headers["origin"] eq "..."` is wrong syntax - it's a multi-value field. Pinning to the browser app's own origin defeats forged-content-type server-to-server POSTs riding the skip.
+- **`ip.src in $corp_egress_ips`** - the named list is maintained centrally. Hardcoding IPs is forbidden - use the list reference.
+- **OWASP child-rule list (the multipart baseline)** - shared by every multipart upload skip in the managed-rules file. Adding a new ID requires per-incident justification from the requester (example: an incident extending the baseline by one rule ID like `3ecd29ca…` should record *why* in the rule's inline comment). Do not invent.
+
+---
+
+## Naming the rule (`description` field)
+
+The `description` is what the rule *does*. It shows up in the Cloudflare Dashboard, Security Events, log lines, `terraform plan` output, and API responses. Choose for grep-ability and intent.
+
+| Shape | Example | Notes |
+|---|---|---|
+| OK - purpose-based | `internal-app-analyze-contract-multipart-skip` | What it does + which host / endpoint + that it's a skip |
+| OK - app + endpoint | `internal-app-stcore-upload-skip` | When the host is the app's identity |
+| OK - endpoint + scope | `internal-api-multipart-upload-skip` | When several apps share the endpoint |
+| Avoid - ticket-prefixed (Terraform) | `INC-XXXXXXXX-INC-YYYYYYYY-...` | When you have an inline comment block, the `description` is for meaning, not provenance - put the ticket in the comment. |
+| Tradeoff - ticket-suffixed (Dashboard / API) | `internal-app-multipart-upload-skip \| CHG-12345` | Dashboard / API have no inline-comment field. Either (a) suffix the ticket here, or (b) maintain a separate runbook that maps rule descriptions to tickets. Pick one per zone; document it. |
+| Avoid - generic | `firewall-skip` / `bypass-rule` | Tells future you nothing |
+
+If the rule was raised against multiple tickets, list them in the provenance artifact for the interface you're using (Terraform comment, Dashboard runbook, or API JSON metadata), not the `description`.
+
+## Provenance + rationale (mandatory)
+
+Every WAF rule needs a durable record of *why it exists*, *who approved it*, *when to revisit*, and *which peer rule it mirrors*. The format is interface-specific because the available carriers differ.
+
+### Terraform
+
+Inline comment block immediately above the rule resource, in HCL `//` syntax:
+
+```hcl
+// <ticket id> - <host> `<path>` <method> <traffic shape>. <Peer-rule cross-reference: e.g. "Same shape as <peer-rule-name>">.
+//
+// Why each guard:
+//   - <origin / corp-IPs / etc>: <one-sentence justification>
+//   - <path predicate choice>: <eq vs starts_with vs alternation, with reason>
+//   - <OWASP child-rule list lineage>: <e.g. "shared baseline from <peer-rule-name>">
+//
+// Approval: <requester / change ticket>, <date>. Review by: <YYYY-MM-DD or "permanent + justification">.
+```
+
+### Cloudflare Dashboard
+
+The UI has no inline-comment field, so the provenance has to live in **two** places (both required):
+
+1. **Rule `description`** - purpose-based name, optionally suffixed with the ticket ID per the naming-tradeoff row above.
+2. **Out-of-band runbook entry** (Confluence / ServiceNow / repo doc / a `waf-rules-log.md` in the governance repo) with the same fields as the Terraform comment block:
+   - ticket, host, path, method, traffic shape
+   - peer-rule cross-reference (rule name or ID in the same zone)
+   - per-guard justification
+   - OWASP child-rule list lineage (for skip rules)
+   - approver, date, review-by date
+
+The Dashboard's **Audit Logs** capture *who changed what when*, but not *why* - the runbook fills that gap. If your team can't commit to maintaining the runbook, switch to Terraform or API authoring; this is not optional.
+
+### Rulesets API
+
+JSON payloads don't carry comments either. Two options - pick one and document it:
+
+1. **Repo-resident JSON** (recommended): commit the JSON payload to a Git repo, with a sibling `.md` file alongside each rule (e.g., `rules/internal-app-multipart-upload-skip.json` + `rules/internal-app-multipart-upload-skip.md`). The `.md` is the provenance block (same fields as Terraform). The PR review enforces it.
+2. **Inline JSON metadata** (lossy): add an unofficial `_metadata` key to your local JSON before stripping it at apply-time. Cloudflare's API ignores unknown top-level fields *today*, but this is undocumented behavior - do not rely on it for production rules.
+
+Either way, the `description` field carries the purpose-based name (and optionally the ticket suffix).
+
+> [!IMPORTANT]
+> A future on-call must be able to read the provenance and answer "should this rule still exist?" without opening a ticket system, regardless of which interface authored it.
+
+---
+
+## Anti-patterns (reject in review)
+
+These have all shown up in past WAF PRs (observed in the wild). If you see one, request changes.
+
+### Shared (all interfaces, both rule types)
+
+1. **`starts_with(http.request.uri.path, "/api/x")` without trailing slash** - matches sibling paths like `/api/x-export`. Either add the trailing slash or use `eq`.
+2. **Title-vs-code drift** - in Terraform: PR title says "broaden" but code says `eq`. In Dashboard: change-ticket says "broaden" but the saved rule uses `eq`. In API: PR description for the JSON payload says "broaden" but the JSON says `eq`. All four sources of truth (title, body, provenance artifact, code / payload / saved rule) must agree.
+3. **Hardcoded IPs** instead of `$corp_egress_ips` (or its API equivalent: a named [IP List](https://developers.cloudflare.com/waf/tools/lists/)). The named list is centrally maintained; hardcoding stale IPs is how you DoS yourself in six months.
+4. **Plain `http.request.headers["X"] eq "..."`** - wrong syntax for a multi-value header field. Use `any(http.request.headers["X"][*] eq "...")`.
+5. **Single-value content-type check** - `http.request.headers["content-type"] eq "multipart/form-data"` is wrong syntax and wrong semantics (header is multi-value, may include `; boundary=...`). Use `any(lower(http.request.headers["content-type"][*])[*] contains "multipart/form-data")`.
+6. **Outer parens wrapping a top-level `and` chain** - `(a and b and c)`. The parens are a no-op; remove them for readability.
+7. **Missing provenance** - every WAF rule (custom or skip) is a policy commitment. Whether the provenance carrier is an HCL `//` comment (Terraform), a runbook entry (Dashboard), or a sibling `.md` (API), the rule does not merge / save / `PUT` without it.
+8. **No `log`-mode soak before enforce** - new block / skip rules should be staged in `action = "log"` (or Dashboard "Log" action / API `"action": "log"`) for at least 24h to validate the predicate hits the intended traffic shape, then promoted to `block` / `skip`.
+
+### Managed-Rule Exceptions only
+
+<!-- markdownlint-disable MD029 -->
+<!-- Numbering continues from the Shared section above so reviewers can reference "anti-pattern #N" unambiguously. -->
+
+9. **Skip applied to whole managed ruleset** when only specific child rules fire - over-broad. List the specific rule IDs in `action_parameters.rules[ruleset_id]` (Terraform / API) or "Skip specific rules" in the Dashboard UI.
+10. **Skip rule placed AFTER the `execute` rule** - has no effect. `skip` only applies to `execute` rules listed after it. Cloudflare doc is explicit: ["Rules with `skip` action only apply to rules with `execute` action listed after them."](https://developers.cloudflare.com/waf/managed-rules/waf-exceptions/define-api/) In the Dashboard, drag the skip rule above the execute rule; in API, use `position.before` with the execute rule's ID; in Terraform, list the skip rule earlier in the `rules` block.
+11. **Multipart skip without `filename=` body marker** - matches POSTs with multipart content-type but no actual file part.
+
+### Custom Rules only
+
+12. **Block rule placed BEFORE the corresponding allow-skip rule** - the block fires first, the allow never gets a chance. Allow-before-block ordering is non-negotiable.
+13. **Geo block without corp-egress escape hatch** - blocks legitimate users in transit. Always include `or ip.src in $corp_egress_ips` (or equivalent named source list).
+14. **`js_challenge` on `/api/*` paths** - breaks API and CLI clients. Use `managed_challenge` for ambiguous traffic, or scope the rule to non-API paths.
+15. **Country-code typos** - country lists like `{"US" "CA" "MX" "GB"}` are case-sensitive ISO-3166 alpha-2. Always paste from the [Cloudflare country code reference](https://developers.cloudflare.com/network/country-codes/), never type from memory.
+
+### Terraform-specific (only when authoring HCL)
+
+16. **Description prefixed with the ticket ID** - the `description` field is for what the rule *does*; put the ticket in the inline `//` comment block. (Existing rules with ticket-prefixed names should be kept as-is - the Dashboard / log history references them.)
+17. **Outer parens wrapping a top-level `and` chain** in HCL - already in Shared #6, but worth restating since HCL is forgiving.
+18. **Heredoc body indented inconsistently with the neighboring rule** - `<<-EOT` strips the shortest leading-whitespace prefix, so semantically a no-op, but it makes diffs noisy. Match the surrounding rule's indent.
+19. **File mode flipped to `100755`** on a `.tf` file - trips `check-executables-have-shebangs` pre-commit. Restore to `100644`.
+20. **Dashboard / API edits not ported back to Terraform** - causes `terraform plan` drift and silent override of peer review. See "Source-of-truth discipline" callout near the top.
+
+### Dashboard-specific (only when authoring via the UI)
+
+21. **Editing a live rule without first cloning it to a staging rule** - no rollback path if the new expression mis-fires. Clone, edit the clone in log mode, validate, then disable the original and enable the clone.
+22. **Saving without recording the change in your team's runbook** - Audit Logs tell you *who / what / when* but never *why*. The runbook is your only `why` carrier in Dashboard authoring; missing entries make rules un-auditable.
+23. **Using bulk-edit / drag-to-reorder without a separate change ticket per logical change** - bulk Dashboard saves are recorded as one Audit Log entry. If three semantically distinct changes ship in one save, debugging which one broke production is harder than it needs to be.
+24. **Authoring directly in production zone without a staging-zone dry-run** - Dashboard has no `terraform plan` equivalent. The dry-run is "save in zone-staging in log mode, observe 24h, then re-author in zone-prod".
+
+### API-specific (only when calling the Rulesets API directly)
+
+25. **Partial `PATCH` without fetching current state first** - the API supports rule-by-rule `PATCH`, but concurrent edits from another tool / human will race. Always `GET` the current ruleset, modify, `PUT` the whole thing with an `If-Match` ETag header to detect concurrent writes.
+26. **Hard-coding `position.index`** instead of `position.before` / `position.after` with a stable rule ID. Index-based positioning breaks the moment anyone else inserts a rule above; ID-relative positioning survives.
+27. **Calling the API without recording the change** in a versioned JSON repo or run-log. Without it, there's no provenance, no review trail, and no way to bulk-rollback.
+28. **Validating the JSON payload only at `PUT` time** - the API returns errors but at that point you've already attempted the change. Run the JSON through [Cloudflare's expression test endpoint](https://developers.cloudflare.com/ruleset-engine/rulesets-api/test/) (`POST /test`) before the destructive `PUT`.
+29. **Skipping ETag / `If-Match` on writes** - lets concurrent writers silently clobber each other. Always send `If-Match: <etag>` on `PUT` / `PATCH`; handle 412 Precondition Failed by re-fetching and re-applying intent.
+
+<!-- markdownlint-enable MD029 -->
+
+---
+
+## Reviewer checklist (copy into PR description / change ticket)
+
+### Shared (always check, regardless of interface)
+
+- [ ] Cloudflare docs have been re-read for this change (WAF custom rules / WAF exceptions / ruleset-engine fields, plus OWASP CRS reference if it's a managed-rule skip)
+- [ ] `description` field is purpose-based, not ticket-prefixed (Terraform) or includes the ticket suffix per the per-zone convention (Dashboard / API)
+- [ ] Peer rule in the same zone has been identified (cross-referenced in the provenance artifact)
+- [ ] Path predicate choice (`eq` vs `starts_with` with-trailing-slash vs alternation) matches requester intent and is documented
+- [ ] All four sources of truth agree (PR / ticket title, PR / ticket body, provenance artifact, saved rule / code / JSON)
+- [ ] Multi-value headers use `any(... [*] ...)` form (not bare `eq`)
+- [ ] Content-type guard (where used) uses `any(lower(...)[*] contains ...)` form
+- [ ] No hardcoded IPs - `$corp_egress_ips` / a named IP List referenced
+- [ ] No outer parens wrapping the top-level `and` chain
+- [ ] Action choice is documented in the provenance artifact (why `block` vs `managed_challenge` vs `skip`)
+- [ ] Provenance artifact present and complete (ticket, peer cross-reference, per-guard rationale, approval source, review-by date)
+- [ ] New block- / skip-class rules went through a `log`-mode soak (linked in PR / ticket) before being promoted
+- [ ] Source-of-truth discipline respected: change made via the zone's documented authoring path
+
+### Managed-Rule Exceptions only
+
+- [ ] OWASP child-rule list is the established baseline - additions justified per incident
+- [ ] Skip rule positioned BEFORE the `execute` rule it bypasses (Terraform: earlier in `rules`; Dashboard: drag above; API: `position.before` with the execute rule's ID)
+- [ ] Multipart skips include the `filename=` body marker
+- [ ] Origin header (when used) uses `any(... [*] eq "...")` form
+
+### Custom Rules only
+
+- [ ] Allow-before-block ordering preserved (skip-allow rules positioned ABOVE block rules)
+- [ ] Geo blocks include corp-egress escape hatch (unless OFAC compliance block, which doesn't)
+- [ ] No `js_challenge` on `/api/*` paths
+- [ ] Country codes copy-pasted from Cloudflare reference, not typed
+
+### Terraform-only (skip if not using Terraform)
+
+- [ ] Inline `//` comment block present (ticket, peer cross-reference, per-guard rationale, approval source)
+- [ ] Heredoc indentation matches neighboring rules in the same file
+- [ ] File mode is `100644` (no accidental `100755`)
+- [ ] `terraform fmt` is clean
+- [ ] `terraform plan` reviewed by author + at least one peer; matches expected diff
+
+### Dashboard-only (skip if not authoring via UI)
+
+- [ ] Runbook entry created (or updated) with the same fields as the Terraform comment block; linked in the change ticket
+- [ ] Change made by cloning the existing rule (if modifying), not editing it in place
+- [ ] Save batched as a single logical change per Audit Log entry (no bulk reorders combined with semantic edits)
+- [ ] Staging-zone dry-run completed (save in log mode in staging zone, observe 24h) before authoring in production zone
+- [ ] Audit Log entry reviewed and matches expected change
+
+### API-only (skip if not calling the Rulesets API directly)
+
+- [ ] JSON payload committed to the versioned repo with its sibling `.md` provenance file
+- [ ] Current ruleset `GET` fetched and ETag captured; `PUT` sent with `If-Match: <etag>`
+- [ ] Position uses `position.before` / `position.after` with a stable rule ID (not `position.index`)
+- [ ] JSON validated via the [expression test endpoint](https://developers.cloudflare.com/ruleset-engine/rulesets-api/test/) before the destructive `PUT`
+- [ ] API response logged (or piped to the run-log) with the new rule's ID and timestamp
+- [ ] 412 Precondition Failed handling tested (re-fetch + re-apply intent path, not blind retry)
+
+---
+
+## Related
+
+- `400-cloudflare.mdc` - broader Cloudflare ruleset guide (OWASP Managed Ruleset configuration with PL1 + anomaly score threshold 60, policy-level managed-rule exception discipline). This file (`405`) is the tactical interface-aware tightening when you're authoring a WAF rule in any of the three paths.
+- `310-security.mdc` - OWASP Top 10 (every WAF rule is reasoned against this)
+- `316-zero-trust.mdc` - rules at the edge are trust-boundary policy
+- `180-terraform.mdc` - general Terraform standards (style, state, secrets) - this file layers Cloudflare-WAF-specific rules on top when the authoring path is Terraform
+
+---
+
+**Cloudflare API version:** v4
+**Cloudflare Terraform provider:** `>= 5.x` (the `cloudflare_ruleset` resource shape)
+**In-scope files (this rule loads on edit):** any `*.tf` or Cloudflare WAF `*.json` matching the globs in the frontmatter `files.include`. For Dashboard authoring (no file context), invoke the rule explicitly (`@405-cloudflare-waf-rules`) or rely on agent topic-discovery (mention Cloudflare WAF / skip rule / managed-rule exception in the conversation). Adjust the globs in your fork if your repo uses different naming.
