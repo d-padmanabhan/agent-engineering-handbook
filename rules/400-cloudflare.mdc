@@ -147,6 +147,8 @@ Deviate only with evidence:
 | Highly regulated or high-value target (financial, healthcare, government) | Consider PL2 with threshold 40 | Pair with extensive per-rule exclusions; start in log-only mode, tune for 2-4 weeks, then enforce |
 | App generates legitimate traffic that looks like an attack (e.g., security tooling, code editors handling raw SQL) | Keep PL1 + 60; add **exclusions** for the specific rule IDs, not a global PL/threshold change | Targeted overrides keep the ruleset's protection elsewhere |
 
+For the per-rule exclusion authoring discipline (consult Cloudflare docs first, scoping ladder, pre-merge checklist, anti-patterns), see the **Managed Rules Exceptions (Skip Rules)** section below.
+
 ### Rollout discipline
 
 1. **Always start in log-only mode** (action = `log`) for a minimum of one week.
@@ -1677,14 +1679,35 @@ This section captures operational guidance for managed rules, attack score tunin
 
 ### Managed Rules Exceptions (Skip Rules)
 
-Use narrow exceptions and skip only what is necessary.
+Managed-rule exceptions are one of the riskiest things you can write in a WAF. Too broad and you silently disable signature coverage you paid for; too narrow and the false positive returns under slightly different load. The discipline below is non-negotiable for any production exception.
+
+#### Before you write the exception (mandatory)
+
+1. **Read Cloudflare's current docs for the specific rule ID(s) you intend to override.** Action semantics (`skip` vs `log` vs `force` vs `set sensitivity`), default sensitivity, the rule's category, and the ruleset version your zone is on - these all change. Static repo content cannot keep current.
+2. **If the `user-cloudflare-docs` MCP server is configured in the workspace**, use it to fetch the rule's current reference page. Otherwise pull from `https://developers.cloudflare.com/waf/managed-rules/` for the rule's reference page.
+3. **Reproduce the false positive in staging or log-only first.** Confirm the exact rule ID firing from the WAF event log, not from a guess based on the symptom - the same symptom can come from different rules.
+4. **Document the exception's reason in the PR description**, not just in a code comment. Link to the WAF event that prompted it.
+
+#### Scoping ladder (use the narrowest that works)
+
+Apply the narrowest scope that solves the problem. Order of preference, narrowest first:
+
+1. **Skip a specific rule ID for a specific host + path** (best case)
+2. Skip a specific rule ID for a specific host + path + IP/ASN constraint
+3. Skip a specific rule ID for a specific host
+4. **Skip the whole managed ruleset for any scope** (avoid; if you got here, redesign)
+
+If you find yourself reaching for option 4, the answer is almost always either (a) a different rule needs to be authored, (b) the matched rule needs a sensitivity tune rather than a skip, or (c) the application code has a real injection-shaped pattern that should be fixed.
+
+#### Authoring pattern
 
 - Place skip rules before the rules they are intended to bypass
 - Prefer skipping specific rule IDs over entire managed rulesets
 - Scope exceptions by host + path (+ optional IP/ASN) to minimize blast radius
-- Add expiration/review notes for temporary exceptions
+- Add expiration / review notes for temporary exceptions
 
 **Expression pattern (example):**
+
 ```javascript
 (
   http.host eq "api-dev.acme.com" and
@@ -1693,8 +1716,29 @@ Use narrow exceptions and skip only what is necessary.
 ```
 
 **Action pattern:**
+
 - Action: `skip`
 - Target: specific managed rule IDs whenever possible
+
+#### Pre-merge checklist (every WAF managed-rule exception PR)
+
+- [ ] Cloudflare docs consulted for every rule ID being overridden; action semantics confirmed
+- [ ] False positive reproduced from a WAF event log (not assumed from symptom)
+- [ ] Specific rule IDs targeted (not whole ruleset)
+- [ ] Scope is narrowest that works (rule-ID + host + path minimum; ladder above)
+- [ ] Expression placed before the rules being bypassed
+- [ ] Expiration / review date in the rule comment (or "permanent" with business justification)
+- [ ] PR description explains *why* this exception is needed and links to the WAF event
+- [ ] Rolled out in log-only first; switched to enforce only after confirming no real attacks were also being matched
+
+#### Anti-patterns reviewers should reject
+
+- Action `skip` against an entire managed ruleset (loses all signature coverage for that ruleset on the matching traffic)
+- Exception scoped only by IP (single CIDR exclusion is fragile; IPs rotate)
+- "Temporary" exception with no expiration date and no PR description rationale (becomes permanent quickly)
+- Skipping a rule because it triggered once in dev without reproducing in staging from the actual event
+- Multiple stacked exceptions for the same rule across different paths (consolidate; multiple narrow exceptions become a wide one)
+- Approving a managed-rule exception PR without the docs link to the specific rule ID
 
 ### WAF Attack Score (Plan-Aware)
 
