@@ -516,6 +516,7 @@ Skills under `skills/` cover repeatable end-to-end workflows that pair with the 
 ### Cloud, data & infrastructure
 
 - **[skills/cloud-platforms](skills/cloud-platforms/)** - AWS / Azure / GCP / Cloudflare patterns
+- **[skills/cloudflare-waf-author](skills/cloudflare-waf-author/)** - Cloudflare WAF rule authoring workflow across Terraform / Dashboard / Rulesets API (pairs with `405-cloudflare-waf-rules.mdc`)
 - **[skills/infrastructure-iac](skills/infrastructure-iac/)** - Terraform / Docker / Ansible / CloudFormation
 - **[skills/containers-orchestration](skills/containers-orchestration/)** - Docker patterns
 - **[skills/kubernetes-containers](skills/kubernetes-containers/)** - Kubernetes / Helm
