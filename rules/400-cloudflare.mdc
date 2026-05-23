@@ -126,7 +126,7 @@ The Cloudflare OWASP Managed Ruleset is Cloudflare's hosted port of the OWASP Mo
 
 ### Recommended starting configuration
 
-**Paranoia Level 1 (PL1) with anomaly score threshold of 60.** Per direct Cloudflare WAF expert recommendation. This is the Cloudflare default and the most permissive configuration; it is also the one with the lowest false-positive rate on real production traffic. Crank up only with evidence that PL1 is missing real attacks against your specific app, never speculatively.
+**Paranoia Level 1 (PL1) with anomaly score threshold of 60.** Per direct Cloudflare WAF expert recommendation (verified: "60" is the **Anomaly Score Threshold** in the Cloudflare WAF UI / API, not a rule ID range or version number). This is the Cloudflare default and the most permissive configuration; it is also the one with the lowest false-positive rate on real production traffic. Crank up only with evidence that PL1 is missing real attacks against your specific app, never speculatively.
 
 | Knob | Recommended | Notes |
 |---|---|---|
