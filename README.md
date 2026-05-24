@@ -39,6 +39,7 @@ Comprehensive, battle-tested configuration for AI coding agents. Curated **rules
 - **[430-azure.mdc](rules/430-azure.mdc)** - Azure (Bicep, Key Vault, App Service)
 - **[420-gcp.mdc](rules/420-gcp.mdc)** - GCP (Cloud Run, GKE, Secret Manager)
 - **[400-cloudflare.mdc](rules/400-cloudflare.mdc)** - Cloudflare (Workers, Rules Engine, WAF policy)
+- **[401-cloudflare-workers.mdc](rules/401-cloudflare-workers.mdc)** - Cloudflare Workers TypeScript non-negotiables (file-scoped to wrangler.jsonc + Worker entry files)
 - **[405-cloudflare-waf-rules.mdc](rules/405-cloudflare-waf-rules.mdc)** - Cloudflare WAF rule tactical playbook for Terraform / Dashboard / API authoring (source-of-truth discipline, predicates, guards, per-interface provenance + checklist)
 
 ### AI & Machine Learning
@@ -517,6 +518,7 @@ Skills under `skills/` cover repeatable end-to-end workflows that pair with the 
 
 - **[skills/cloud-platforms](skills/cloud-platforms/)** - AWS / Azure / GCP / Cloudflare patterns
 - **[skills/cloudflare-waf-author](skills/cloudflare-waf-author/)** - Cloudflare WAF rule authoring workflow across Terraform / Dashboard / Rulesets API (pairs with `405-cloudflare-waf-rules.mdc`)
+- **[skills/cloudflare-workers-author](skills/cloudflare-workers-author/)** - Cloudflare Workers TypeScript authoring workflow: bootstrap, bindings + storage decision matrix, Hono + RPC patterns, testing with `@cloudflare/vitest-pool-workers`, gradual deployments, common pitfalls (pairs with `401-cloudflare-workers.mdc`)
 - **[skills/infrastructure-iac](skills/infrastructure-iac/)** - Terraform / Docker / Ansible / CloudFormation
 - **[skills/containers-orchestration](skills/containers-orchestration/)** - Docker patterns
 - **[skills/kubernetes-containers](skills/kubernetes-containers/)** - Kubernetes / Helm

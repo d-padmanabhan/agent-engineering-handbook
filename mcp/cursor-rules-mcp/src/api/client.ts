@@ -82,6 +82,7 @@ export class ApiClient {
       },
       cloud: {
         cloudflare: '400-cloudflare.mdc',
+        'cloudflare-workers': '401-cloudflare-workers.mdc',
         'cloudflare-waf-rules': '405-cloudflare-waf-rules.mdc',
         aws: '410-aws.mdc',
         'aws-iam': '412-aws-iam.mdc',
@@ -194,6 +195,7 @@ export class ApiClient {
 
       // Cloud
       { category: 'cloud', topic: 'cloudflare', title: 'Cloudflare', description: 'Workers, Rules Engine, DNS, security', priority: 400, content: '' },
+      { category: 'cloud', topic: 'cloudflare-workers', title: 'Cloudflare Workers (TypeScript)', description: 'File-scoped non-negotiables: Module Workers, typed Env, no secrets in logs, ctx.waitUntil, subrequest budgets, Service Bindings + RPC, wrangler.jsonc as source of truth', priority: 401, content: '' },
       { category: 'cloud', topic: 'cloudflare-waf-rules', title: 'Cloudflare WAF Rules (Terraform + Dashboard + API)', description: 'Interface-agnostic tactical playbook for Cloudflare WAF rule authoring: source-of-truth discipline, path predicate matrix, multi-value headers, required guards, per-interface provenance and reviewer checklist', priority: 405, content: '' },
       { category: 'cloud', topic: 'aws', title: 'AWS', description: 'EKS, VPC Lattice, Lambda, Zero Trust', priority: 410, content: '' },
       { category: 'cloud', topic: 'aws-iam', title: 'AWS IAM', description: 'Principals, SCPs, KMS, AccessDenied debugging', priority: 412, content: '' },
