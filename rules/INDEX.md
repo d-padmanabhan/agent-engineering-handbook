@@ -61,6 +61,7 @@ Quick lookup table for all Cursor rules files in `rules/`.
 | File | Description | Priority | Always Apply |
 |------|-------------|----------|--------------|
 | [400-cloudflare.mdc](400-cloudflare.mdc) | End-to-end prompts and patterns for designing, testing, and deploying Cloudflare rulesets (WAF, Rate Limiting, Transform, Workers integration). | 400 | No |
+| [401-cloudflare-workers.mdc](401-cloudflare-workers.mdc) | File-scoped non-negotiables for authoring or reviewing Cloudflare Workers in TypeScript: Module Workers only, typed Env from wrangler types, no secrets in logs, ctx.waitUntil for fire-and-forget, subrequest budgets, named bindings only, Service Bindings + RPC for Worker-to-Worker calls, wrangler.jsonc as source of truth. Loads on wrangler config files + common Worker entry-point names. | 401 | No |
 | [405-cloudflare-waf-rules.mdc](405-cloudflare-waf-rules.mdc) | Interface-agnostic tactical playbook for Cloudflare WAF rule authoring across Terraform, Dashboard, and Rulesets API (custom rules + managed-rule exceptions): source-of-truth discipline, pre-edit gate, path predicate matrix, multi-value header syntax, required guards, per-interface provenance, anti-patterns, per-interface reviewer checklist. | 405 | No |
 | [410-aws.mdc](410-aws.mdc) | Best practices for AWS services, EKS, Platform Engineering, Zero Trust, and cloud infrastructure patterns. | 410 | No |
 | [412-aws-iam.mdc](412-aws-iam.mdc) | AWS-specific IAM guidance covering principal types, policy evaluation, cross-account assume role patterns, SCPs, KMS key policies/grants, and AccessDenied debugging. | 412 | No |
@@ -108,7 +109,7 @@ Quick lookup table for all Cursor rules files in `rules/`.
 - **Utilities + docs**: [120-utilities.mdc](120-utilities.mdc), [800-markdown.mdc](800-markdown.mdc), [810-documentation.mdc](810-documentation.mdc), [815-reactflow-diagrams.mdc](815-reactflow-diagrams.mdc)
 - **Languages**: [140-bash.mdc](140-bash.mdc), [200-python.mdc](200-python.mdc), [210-go.mdc](210-go.mdc), [220-rust.mdc](220-rust.mdc), [230-javascript.mdc](230-javascript.mdc), [240-typescript.mdc](240-typescript.mdc)
 - **Security**: [310-security.mdc](310-security.mdc), [315-iam.mdc](315-iam.mdc), [316-zero-trust.mdc](316-zero-trust.mdc), [317-okta.mdc](317-okta.mdc), [318-workload-identity.mdc](318-workload-identity.mdc), [412-aws-iam.mdc](412-aws-iam.mdc)
-- **Cloud + IaC**: [170-cloudformation.mdc](170-cloudformation.mdc), [180-terraform.mdc](180-terraform.mdc), [400-cloudflare.mdc](400-cloudflare.mdc), [405-cloudflare-waf-rules.mdc](405-cloudflare-waf-rules.mdc), [410-aws.mdc](410-aws.mdc), [420-gcp.mdc](420-gcp.mdc), [430-azure.mdc](430-azure.mdc)
+- **Cloud + IaC**: [170-cloudformation.mdc](170-cloudformation.mdc), [180-terraform.mdc](180-terraform.mdc), [400-cloudflare.mdc](400-cloudflare.mdc), [401-cloudflare-workers.mdc](401-cloudflare-workers.mdc), [405-cloudflare-waf-rules.mdc](405-cloudflare-waf-rules.mdc), [410-aws.mdc](410-aws.mdc), [420-gcp.mdc](420-gcp.mdc), [430-azure.mdc](430-azure.mdc)
 - **Containers**: [440-docker.mdc](440-docker.mdc), [450-kubernetes.mdc](450-kubernetes.mdc), [460-helm.mdc](460-helm.mdc)
 - **Databases**: [470-postgresql.mdc](470-postgresql.mdc), [475-sql.mdc](475-sql.mdc)
 - **AI + MCP**: [500-ai-ml.mdc](500-ai-ml.mdc), [510-mcp-servers.mdc](510-mcp-servers.mdc)

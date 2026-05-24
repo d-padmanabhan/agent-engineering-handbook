@@ -1,0 +1,353 @@
+---
+title: Cloudflare Workers (TypeScript, Module Workers, typed bindings)
+description: File-scoped non-negotiables for authoring or reviewing Cloudflare Workers in TypeScript. Module Workers syntax only; Env interface generated from wrangler.jsonc via wrangler types; no secrets in logs; waitUntil for fire-and-forget; subrequest budgets respected; named bindings only. Loads when editing wrangler config files or common Worker entry-point names; for ad-hoc Worker work outside these conventions, invoke explicitly or self-select via topic.
+priority: 401
+alwaysApply: false
+files:
+  include:
+    - "**/wrangler.jsonc"
+    - "**/wrangler.json"
+    - "**/wrangler.toml"
+    - "**/workers/**/*.ts"
+    - "**/workers/**/*.js"
+    - "**/src/worker.ts"
+    - "**/src/worker.js"
+    - "**/worker.ts"
+    - "**/worker.js"
+    - "**/src/index.ts"
+    - "**/.dev.vars"
+    - "**/worker-configuration.d.ts"
+---
+
+# Cloudflare Workers (TypeScript, Module Workers, typed bindings)
+
+**Audience:** anyone authoring or reviewing a Cloudflare Worker - default-export Worker, named entrypoint, Durable Object, Workflow, Queue consumer, Cron Trigger, Email Worker, or Pages Function.
+
+**Relationship to other rules:**
+
+- `400-cloudflare.mdc` - broad Cloudflare platform playbook (Workers + Access + AOP + WAF + Workflows + etc.). This file is the file-scoped Worker-authoring tightening.
+- `405-cloudflare-waf-rules.mdc` - file-scoped WAF rule playbook. Same pattern (file-scoped tactical rule).
+- `240-typescript.mdc` - general TypeScript standards. This file layers Workers-specific TS rules on top.
+- `320-api-design.mdc` - REST API design. Applies when the Worker exposes HTTP endpoints.
+- `325-networking.mdc` - HTTP / gRPC client reuse, idle timeouts. Workers have specific subrequest semantics covered here.
+
+**Companion skill:** `cloudflare-workers-author` walks through the bootstrap, bindings choice, routing, testing, and deployment workflow. This rule is the gate; the skill is the workflow through the gate.
+
+> [!IMPORTANT]
+> The non-negotiables below are file-scoped. They auto-load when editing `wrangler.jsonc` (or common Worker entry-point names). If you're authoring a Worker in an unusual location, invoke this rule explicitly or trigger topic discovery by mentioning Cloudflare Workers in the conversation.
+
+---
+
+## Non-negotiables
+
+### NN-1: Module Workers syntax only (Service Worker syntax is forbidden in new code)
+
+Cloudflare Workers has two execution models:
+
+- **Module Workers** (`export default { fetch(req, env, ctx) { ... } }`) - the modern model. Bindings come through `env`; lifecycle through `ctx`; supports TypeScript natively; supports RPC via `WorkerEntrypoint`; supports Durable Objects, Workflows, RPC, Queues, Cron, Email, etc.
+- **Service Worker** (`addEventListener("fetch", event => { ... })`) - the original model. **Deprecated** for new development. Bindings come through global scope; no RPC; no named entrypoints; no `cloudflare:workers` module imports.
+
+**Required:** every new Worker uses Module Workers syntax. **Reject in review:** any new `addEventListener("fetch", ...)` Worker.
+
+**Existing Service Workers:** keep them working, but migrate to Module Workers before adding new features. The migration is mechanical; the [Cloudflare migration guide](https://developers.cloudflare.com/workers/reference/migrate-to-module-workers/) walks through it.
+
+### NN-2: Typed Env from `wrangler types` (never `any`)
+
+```typescript
+// REQUIRED at the top of your Worker entry file
+import type { ExportedHandler } from "@cloudflare/workers-types";
+
+export interface Env {
+  // Populated by `wrangler types` into worker-configuration.d.ts.
+  // Keep this import-based; do not hand-author bindings types.
+}
+
+export default {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // env.MY_KV, env.MY_DB, env.MY_QUEUE, etc. are all typed
+    return new Response("ok");
+  },
+} satisfies ExportedHandler<Env>;
+```
+
+**Required:** run `wrangler types` (or add it to `package.json` `scripts.build`) so the generated `worker-configuration.d.ts` is current. Reference the generated `Env` type via `satisfies ExportedHandler<Env>` (not `as`) so type errors surface at compile time.
+
+**Reject in review:**
+
+- `env: any` or `env: Record<string, any>` in handler signatures
+- Hand-authored `Env` interfaces that drift from `wrangler.jsonc` bindings
+- Missing `satisfies ExportedHandler<Env>` (loses type checking on the handler shape)
+
+### NN-3: Secrets via `wrangler secret put` - never inline, never logged
+
+Secrets are bindings; they appear in `env` like any other binding but are not written to the `wrangler.jsonc` file.
+
+```bash
+# Create / rotate
+wrangler secret put API_KEY                # prompts for value
+wrangler secret put API_KEY --env production
+echo "$VALUE" | wrangler secret put API_KEY   # CI pattern
+
+# List (names only; values never returned)
+wrangler secret list
+```
+
+**Required:**
+
+- Secrets declared in `wrangler.jsonc` `vars` block: NONE. `vars` is for non-sensitive configuration.
+- Local dev secrets live in `.dev.vars` (a `dotenv`-style file at the project root). `.dev.vars` MUST be in `.gitignore`.
+- Production secrets set via `wrangler secret put` (CI: `wrangler secret put NAME` piped from a CI secret).
+- Add a `secrets:` block to `wrangler.jsonc` declaring expected secret names (without values) so the type generator includes them in `Env`.
+
+**Reject in review:**
+
+- `console.log(env.SECRET_NAME)` or any code path that includes a secret in a log line, error message, response body, or thrown error
+- `vars` entries containing API keys, tokens, JWT signing keys, database passwords
+- `.dev.vars` not in `.gitignore`
+
+### NN-4: `ctx.waitUntil` for fire-and-forget async work
+
+Async work that doesn't block the response must be wrapped in `ctx.waitUntil()`. Otherwise the Worker terminates as soon as the response is sent, and your pending Promise gets cancelled mid-flight.
+
+```typescript
+export default {
+  async fetch(req, env, ctx): Promise<Response> {
+    const response = new Response("ok");
+
+    // BAD: this Promise gets cancelled when the Worker returns
+    void env.ANALYTICS.writeDataPoint({ blobs: ["request"], indexes: ["123"] });
+
+    // GOOD: ctx.waitUntil extends the Worker's lifetime until the Promise settles
+    ctx.waitUntil(
+      env.ANALYTICS.writeDataPoint({ blobs: ["request"], indexes: ["123"] }),
+    );
+
+    return response;
+  },
+} satisfies ExportedHandler<Env>;
+```
+
+**Required:** any async call whose result is NOT awaited before `return new Response(...)` must be wrapped in `ctx.waitUntil()`. Common cases: analytics writes, async logging, KV / R2 / D1 writes that aren't on the critical path, cache.put().
+
+**Reject in review:**
+
+- `void someAsyncCall()` after the response is constructed but not awaited and not wrapped in `waitUntil`
+- KV / R2 / D1 / Queues / Analytics Engine writes inside `then(...)` chains that fire after `return`
+
+### NN-5: Named bindings, never env-var equivalents
+
+Cloudflare resources (KV, R2, D1, Queues, Durable Objects, Hyperdrive, Service Bindings, AI, Vectorize, Workers AI) MUST be declared as bindings in `wrangler.jsonc`. They are NOT environment variables.
+
+```jsonc
+{
+  "name": "my-worker",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-04-01",
+
+  "kv_namespaces": [
+    { "binding": "SESSION_KV", "id": "<kv-id>" }
+  ],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "production", "database_id": "<d1-id>" }
+  ],
+  "r2_buckets": [
+    { "binding": "ASSETS", "bucket_name": "production-assets" }
+  ],
+  "queues": {
+    "producers": [{ "binding": "INGEST_QUEUE", "queue": "ingest" }],
+    "consumers": [{ "queue": "ingest", "max_batch_size": 25 }]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "Room" }]
+  },
+  "hyperdrive": [
+    { "binding": "POSTGRES", "id": "<hyperdrive-id>" }
+  ],
+  "services": [
+    { "binding": "AUTH", "service": "auth-worker", "entrypoint": "AuthEntrypoint" }
+  ]
+}
+```
+
+**Reject in review:**
+
+- A KV / D1 / R2 ID stored in `vars` and looked up via `env.KV_ID` at runtime (defeats Worker's binding model; no type safety; no quota awareness)
+- Hardcoded resource IDs in source code
+- `fetch("https://my-other-worker.workers.dev/...")` to call another Worker on the same account (use a Service Binding instead - faster, no public URL, no metering charge, no DNS resolution)
+
+### NN-6: Subrequest budget awareness
+
+Workers have a per-request subrequest budget:
+
+- **Free plan:** 50 subrequests per request
+- **Paid plan (Workers Standard / Bundled):** 1000 subrequests per request
+- **Service Bindings count as subrequests** (but RPC calls are cheaper than fetch())
+- **Cache API calls count as subrequests**
+- **KV / R2 / D1 / Queues binding calls count as subrequests**
+
+**Required:** for any handler that issues subrequests in a loop (over an array, paginated API, etc.), add a guard for the budget or batch the requests.
+
+```typescript
+// BAD: unbounded loop with one subrequest per item
+for (const id of ids) {
+  await env.DB.prepare("INSERT INTO events ...").bind(id).run();
+}
+
+// GOOD: D1 batch (one subrequest for N statements)
+const stmts = ids.map((id) =>
+  env.DB.prepare("INSERT INTO events ...").bind(id),
+);
+await env.DB.batch(stmts);
+```
+
+**Reject in review:**
+
+- Loops over user-controlled input lengths with one subrequest per iteration (unbounded blast radius)
+- D1 inserts without `batch()`
+- KV writes inside loops without considering batching alternatives (KV doesn't support bulk write; consider R2 + listing, or DO storage, or D1)
+
+### NN-7: No top-level await; no module-scope `fetch()`; no module-scope mutable state
+
+The Worker's module scope is shared across requests within the same isolate. State mutated in module scope persists across requests in the same isolate but NOT across isolates - which gives you the worst of both worlds (intermittent state pollution that's hard to reproduce).
+
+```typescript
+// BAD: top-level fetch runs on every cold start, blocks startup, costs subrequests
+const config = await fetch("https://config.example.com/").then((r) => r.json());
+
+// BAD: module-scope mutable state - persists across requests in this isolate only
+let requestCounter = 0;
+export default {
+  async fetch() {
+    requestCounter++; // ← non-deterministic across isolates
+    return new Response(String(requestCounter));
+  },
+};
+
+// GOOD: lazy-init pattern with explicit cache
+let cachedConfig: Config | null = null;
+async function getConfig(env: Env): Promise<Config> {
+  if (cachedConfig) return cachedConfig;
+  cachedConfig = await env.CONFIG_KV.get<Config>("config", "json");
+  return cachedConfig!;
+}
+```
+
+**Reject in review:**
+
+- `await` at module scope (anything outside `export default { ... }` or class methods)
+- `let foo = 0;` at module scope used to track per-request state
+- Caches at module scope without explicit invalidation strategy
+
+### NN-8: `compatibility_date` set; `compatibility_flags` minimal and intentional
+
+```jsonc
+{
+  "compatibility_date": "2026-04-01",   // REQUIRED for new Workers
+  "compatibility_flags": [
+    "nodejs_compat"   // include only if you actually use Node.js APIs
+  ]
+}
+```
+
+**Required:**
+
+- `compatibility_date` set to the date the Worker was authored or last reviewed for compatibility (not today's date by default - the date represents the runtime behavior contract you've tested against).
+- Bumping the `compatibility_date` is a deliberate change reviewed against the [Runtime API changelog](https://developers.cloudflare.com/workers/configuration/compatibility-dates/).
+- `nodejs_compat` flag included ONLY if you import from `node:*` modules. Including it unnecessarily increases the Worker's bundle size and changes runtime behavior subtly.
+
+**Reject in review:**
+
+- Missing `compatibility_date`
+- `compatibility_flags` containing flags that aren't documented in the Cloudflare reference
+
+### NN-9: Service Bindings for Worker-to-Worker calls; never public URLs
+
+If Worker A needs to call Worker B and both are on your Cloudflare account, use a Service Binding. Never call Worker B's public URL from Worker A.
+
+```jsonc
+// wrangler.jsonc for Worker A
+{
+  "services": [
+    {
+      "binding": "AUTH",
+      "service": "auth-worker",
+      "entrypoint": "AuthEntrypoint"   // optional: bind to a named WorkerEntrypoint class
+    }
+  ]
+}
+```
+
+```typescript
+// Worker A code
+const result = await env.AUTH.validateToken(req.headers.get("authorization"));
+```
+
+**Why:**
+
+- Service Bindings are billed as one subrequest, not as outbound HTTP (cheaper).
+- Service Bindings don't traverse the public internet (faster, no DNS, no TLS handshake).
+- Service Bindings carry over the Cloudflare-managed request context (trace IDs, version overrides).
+- Service Bindings work with [RPC via `WorkerEntrypoint`](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/rpc/) - you call methods directly, with typed arguments and return values, without HTTP serialization overhead.
+
+**Reject in review:**
+
+- `fetch("https://<my-worker>.workers.dev/...")` from another Worker on the same account
+- Hand-rolled HTTP clients to internal Workers when a Service Binding would work
+
+### NN-10: `wrangler.jsonc` is the source of truth (not the Dashboard)
+
+For Workers managed by Wrangler (which should be: all of them), the `wrangler.jsonc` file in your repo is the authoritative configuration. The Cloudflare Dashboard is read-only for these Workers except for one-off rotations of secrets (`wrangler secret put` from CI is the steady-state pattern).
+
+**Required:**
+
+- A `wrangler.jsonc` (or `wrangler.toml` for older projects) committed to the repo for every Worker.
+- A deployment path that uses `wrangler deploy` (or `wrangler versions upload` + `wrangler versions deploy`) from CI - never a Dashboard "Edit code" save in production.
+
+**Reject in review:**
+
+- A Worker deployed via Dashboard "Edit code" with no committed source
+- Drift between the Dashboard configuration and the committed `wrangler.jsonc` (run `wrangler deploy --dry-run` periodically to detect)
+
+---
+
+## File-format conventions (this rule loads on edit)
+
+- **`wrangler.jsonc`** is the modern format ([recommended by Cloudflare](https://developers.cloudflare.com/workers/wrangler/configuration/) since Wrangler v3.91.0). Use it for all new Workers. JSONC supports comments, which `wrangler.json` does not.
+- **`wrangler.toml`** is still supported but some newer features are JSON-only. Keep existing `.toml` files; don't introduce new ones.
+- **`.dev.vars`** is the local-dev secrets file (`KEY=value` per line, dotenv format). Must be in `.gitignore`.
+- **`worker-configuration.d.ts`** is generated by `wrangler types`. Should be in `.gitignore` OR committed and regenerated in CI; pick one per repo and document it.
+
+---
+
+## Reviewer checklist (copy into PR description)
+
+- [ ] Module Workers syntax (`export default {...}` or `class extends WorkerEntrypoint`); no new `addEventListener("fetch", ...)`
+- [ ] `Env` type imported from generated `worker-configuration.d.ts`; `satisfies ExportedHandler<Env>` present on the default export
+- [ ] No `console.log` of secret bindings; no secrets in error messages or response bodies
+- [ ] All fire-and-forget async work wrapped in `ctx.waitUntil()`
+- [ ] Cloudflare resources (KV, D1, R2, Queues, DO, Hyperdrive, Service Bindings) declared as bindings in `wrangler.jsonc`; not as env vars
+- [ ] Subrequest budget considered; loops use batching where the API supports it
+- [ ] No top-level await; no module-scope mutable state; no module-scope `fetch()`
+- [ ] `compatibility_date` set; `compatibility_flags` minimal and justified (each flag named in the PR description)
+- [ ] Worker-to-Worker calls use Service Bindings + RPC (not public URLs)
+- [ ] `wrangler.jsonc` is the source of truth; Dashboard edits forbidden except secret rotation via `wrangler secret put`
+- [ ] `wrangler deploy --dry-run` clean; `wrangler types` regenerated; `tsc --noEmit` clean
+- [ ] Tests use `@cloudflare/vitest-pool-workers` (see `cloudflare-workers-author` skill § "Testing"); not `unstable_dev` (deprecated)
+
+---
+
+## Related
+
+- `400-cloudflare.mdc` - broader Cloudflare platform playbook
+- `405-cloudflare-waf-rules.mdc` - file-scoped WAF rule playbook (same architectural pattern as this file)
+- `240-typescript.mdc` - general TypeScript standards
+- `320-api-design.mdc` - REST API design (applies when the Worker is an HTTP endpoint)
+- `325-networking.mdc` - HTTP / gRPC client reuse, idle timeouts
+- `skills/cloudflare-workers-author/` - the workflow companion
+- `skills/cloud-platforms/references/cloudflare.md` - reference material for Workers, Durable Objects, Pages, D1, R2, Workflows, Queues, KV, Hyperdrive, Workers AI, Vectorize, AI Gateway
+
+---
+
+**Cloudflare Wrangler:** `>= 3.91.0` (for `wrangler.jsonc` support); `>= 4.x` recommended.
+**Cloudflare Workers runtime:** Module Workers required for new code.
+**In-scope files (this rule loads on edit):** wrangler config files, common Worker entry-point names, `.dev.vars`, generated type files. Adjust globs in your fork if your repo uses different naming.
