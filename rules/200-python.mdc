@@ -108,6 +108,33 @@ def divide(a: float, b: float) -> float:
 
 > Run `python -c "import this"` in any Python REPL to see the canonical text.
 
+## Non-negotiables
+
+> [!IMPORTANT]
+> These are the hard floors. Every other section in this rule is guidance; the items below are **reject-in-review**.
+
+### NN-1: Python ≥ 3.14 for new applications, services, and Lambda functions
+
+Any new Python application, service, scheduled job, CLI tool, or AWS Lambda function ships with `requires-python = ">=3.14"`. This is non-negotiable for the same reason Module Workers syntax is non-negotiable for new Cloudflare Workers (`401-cloudflare-workers.mdc` NN-1): consistent runtime semantics, access to current type-system features (built-in generics, `|` union syntax, template strings, deferred annotations, free-threading), and the cost of supporting older runtimes that the rest of the codebase doesn't.
+
+**Exception - libraries with broad audiences:**
+
+Libraries published to PyPI or shipped to external customers MAY target a lower floor when there is a stated compatibility commitment. The acceptable lower floor is **Python 3.11** (the oldest CPython version with active security support per [PEP 387 deprecation policy](https://peps.python.org/pep-0387/) as of this rule's last review). The PR description MUST include:
+
+- The audience justification (e.g., "library targets all CPython versions with active security support per PEP 387")
+- The features being foregone by the lower floor (no template strings, no deferred annotations, no free-threading, no built-in `type` statement)
+- A planned floor-bump date (e.g., "raise to 3.14 when 3.11 reaches EOL")
+
+**Reject in review:**
+
+- New application / service / Lambda with `requires-python = ">=3.11"` (or lower) and no library-audience justification
+- New code targeting Python 3.10 or below for any reason (3.10 reaches EOL in October 2026; 3.11 is the absolute floor)
+- `pyproject.toml` without `requires-python` at all (must be explicit)
+- New code using `from typing import List, Dict, Optional, Tuple, Union` instead of `list[X]`, `dict[K, V]`, `X | None`, `tuple[X, Y]`, `X | Y` (the 3.14+ built-in generics + `|` union syntax are the only acceptable forms; see § Type Hints below)
+- `Dockerfile` based on `python:3.13`, `python:3.12`, `python:3.11`, or older for a new app / service / Lambda
+- CI workflow using `python-version: '3.13'`, `'3.12'`, `'3.11'`, or older for a new app / service / Lambda
+- `runtime = "python3.13"` (or older) in Lambda / serverless configuration for a new function
+
 ## 0) AI Assistant Guidelines
 
 When providing code assistance, follow these guardrails:

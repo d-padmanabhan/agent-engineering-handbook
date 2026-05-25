@@ -47,6 +47,24 @@ For per-line operative readings (how to apply each in review), see the Zen secti
 - **Keep It Simple**: Prefer stdlib over complex architectures
 - **Respect Context**: Don't transform a 20-line script into a 200-line framework
 
+## Non-negotiables
+
+> [!IMPORTANT]
+> New Python applications, services, scheduled jobs, CLI tools, and AWS Lambda functions target **Python ≥ 3.14**. Treat lower runtimes as a reject-in-review issue unless the code is a library / SDK with a stated compatibility commitment.
+
+### NN-1: Python ≥ 3.14 for new applications, services, and Lambda functions
+
+Use `requires-python = ">=3.14"` in `pyproject.toml`, Python 3.14 in CI, Python 3.14 Docker images, and Python 3.14 Lambda runtimes for new code.
+
+Libraries published to PyPI or shipped to external customers MAY target a lower floor when there is a documented compatibility commitment. The acceptable lower floor is Python 3.11. The PR description must explain the audience, the 3.14 features being deferred, and the planned floor-bump date.
+
+Reject in review:
+
+- New application / service / Lambda with `requires-python = ">=3.11"` (or lower) and no library-audience justification
+- Missing `requires-python` in `pyproject.toml`
+- New code targeting Python 3.10 or below for any reason
+- CI, Docker, or Lambda runtime config pinned below Python 3.14 for new app / service / Lambda code
+
 ## Standards Quick Reference
 
 | Aspect | Standard |
