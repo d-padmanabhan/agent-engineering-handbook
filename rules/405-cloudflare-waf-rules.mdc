@@ -118,7 +118,7 @@ This is the most-litigated decision in WAF reviews. Use this matrix; document th
 >
 > Per-interface mapping:
 >
-> - **Terraform:** PR title + PR body + HCL `//` comment + the expression in HCL.
+> - **Terraform:** PR title + PR body + HCL `#` comment + the expression in HCL.
 > - **Dashboard:** change ticket title + change ticket body + runbook entry + the expression in the UI's expression editor.
 > - **API:** PR title + PR body in the JSON repo + the sibling `.md` provenance file + the `expression` field in the JSON.
 
@@ -202,17 +202,17 @@ Every WAF rule needs a durable record of *why it exists*, *who approved it*, *wh
 
 ### Terraform
 
-Inline comment block immediately above the rule resource, in HCL `//` syntax:
+Inline comment block immediately above the rule resource, in HCL `#` syntax:
 
 ```hcl
-// <ticket id> - <host> `<path>` <method> <traffic shape>. <Peer-rule cross-reference: e.g. "Same shape as <peer-rule-name>">.
-//
-// Why each guard:
-//   - <origin / trusted-IPs / etc>: <one-sentence justification>
-//   - <path predicate choice>: <eq vs starts_with vs alternation, with reason>
-//   - <OWASP child-rule list lineage>: <e.g. "shared baseline from <peer-rule-name>">
-//
-// Approval: <requester / change ticket>, <date>. Review by: <YYYY-MM-DD or "permanent + justification">.
+# <ticket id> - <host> `<path>` <method> <traffic shape>. <Peer-rule cross-reference: e.g. "Same shape as <peer-rule-name>">.
+#
+# Why each guard:
+#   - <origin / trusted-IPs / etc>: <one-sentence justification>
+#   - <path predicate choice>: <eq vs starts_with vs alternation, with reason>
+#   - <OWASP child-rule list lineage>: <e.g. "shared baseline from <peer-rule-name>">
+#
+# Approval: <requester / change ticket>, <date>. Review by: <YYYY-MM-DD or "permanent + justification">.
 ```
 
 ### Cloudflare Dashboard
@@ -255,7 +255,7 @@ These have all shown up in past WAF PRs (observed in the wild). If you see one, 
 4. **Plain `http.request.headers["X"] eq "..."`** - wrong syntax for a multi-value header field. Use `any(http.request.headers["X"][*] eq "...")`.
 5. **Single-value content-type check** - `http.request.headers["content-type"] eq "multipart/form-data"` is wrong syntax and wrong semantics (header is multi-value, may include `; boundary=...`). Use `any(lower(http.request.headers["content-type"][*])[*] contains "multipart/form-data")`.
 6. **Outer parens wrapping a top-level `and` chain** - `(a and b and c)`. The parens are a no-op; remove them for readability.
-7. **Missing provenance** - every WAF rule (custom or skip) is a policy commitment. Whether the provenance carrier is an HCL `//` comment (Terraform), a runbook entry (Dashboard), or a sibling `.md` (API), the rule does not merge / save / `PUT` without it.
+7. **Missing provenance** - every WAF rule (custom or skip) is a policy commitment. Whether the provenance carrier is an HCL `#` comment (Terraform), a runbook entry (Dashboard), or a sibling `.md` (API), the rule does not merge / save / `PUT` without it.
 8. **No `log`-mode soak before enforce** - new block / skip rules should be staged in `action = "log"` (or Dashboard "Log" action / API `"action": "log"`) for at least 24h to validate the predicate hits the intended traffic shape, then promoted to `block` / `skip`.
 
 ### Managed-Rule Exceptions only

@@ -198,6 +198,43 @@ securityContext:
       - ALL
 ```
 
+### Privileged Pods and Host Namespaces
+
+For normal application workloads, reject:
+
+```yaml
+spec:
+  hostPID: true
+  hostIPC: true
+  hostNetwork: true
+  containers:
+    - name: app
+      securityContext:
+        privileged: true
+```
+
+Why: `privileged: true` grants broad kernel/device access, and host namespaces let the pod see or share node-level process, IPC, or network state. Together, these settings are close to node-level access from inside the pod.
+
+Use the restricted baseline instead:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+containers:
+  - name: app
+    securityContext:
+      privileged: false
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+```
+
+Exceptions are narrow: CNI / CSI components, eBPF observability, runtime security agents, node problem detectors, and short-lived break-glass diagnostics. Require an owner, reason, dedicated namespace, scoped service account/RBAC, duration, and review date before allowing an exception.
+
 ## Helm Quick Reference
 
 ```bash

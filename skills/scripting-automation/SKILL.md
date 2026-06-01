@@ -14,6 +14,7 @@ description: Advanced Bash automation patterns for production-grade scripts and 
 - **"Composition over complexity"** - Small functions, clear separation of concerns, reusable patterns
 - **"Observability is essential"** - Structured logging, proper exit codes, error context
 - **"Test what you write"** - Use shellcheck, test on multiple platforms, write BATS tests
+- **"Format consistently"** - Must pass `shfmt -i 2 -ci -sr -bn` (2-space indentation; prefer ~100-character lines)
 
 ## Quick Reference
 
@@ -29,7 +30,61 @@ trap 'cleanup' EXIT         # Always cleanup
 flock -n 200 || exit 1      # Prevent concurrent runs
 readonly VAR="value"        # Immutable constant
 local var="value"           # Function-local variable
+shfmt -w -i 2 -ci -sr -bn . # Format with Google-style 2-space indentation
 ```
+
+## Standard Header + Prelude
+
+Use this for new automation scripts. It documents purpose and usage, keeps debug tracing available but commented, creates a timestamped logfile named after the script, and uses a safe logging helper instead of raw `echo`.
+
+```bash
+#!/usr/bin/env bash
+#
+# Script Name         : <script_name>.sh
+#
+# Purpose             : <One or two sentences explaining what the script does.
+#                       Wrap continuation lines under the value column.>
+#
+# Dependencies        : <List required commands, or "None">
+#
+# Script Usage        : ./<script_name>.sh [options] <arguments>
+#
+#                       <Examples and argument notes.>
+#
+##----------------------------------------------------------------------------------------##
+# Turn debug on or off
+# set -x
+##----------------------------------------------------------------------------------------##
+
+set -euo pipefail
+
+readonly DTTM="$(date -u +"%Y%m%d_%H%M%S")"
+readonly SCRIPT_NAME="$(basename "${0}" .sh)"
+readonly LOGFILE="${SCRIPT_NAME}_${DTTM}.log"
+
+logmsg() {
+  local timestamp
+  timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  printf "%s: %s\n" "${timestamp}" "$*" | tee -a "${LOGFILE}" >&2
+}
+```
+
+## Generation Contract
+
+For any non-trivial automation script (argument parsing, dependency checks, config resolution, build/deploy/verify steps), generate this structure:
+
+1. Header block.
+2. Commented debug toggle (`# set -x`), disabled by default.
+3. Strict or controlled mode.
+4. Readonly constants and timestamped `LOGFILE`.
+5. `logmsg`, `die`, and optional `debug` helper.
+6. `require_command` for dependencies.
+7. Helper functions with lowercase locals.
+8. `parse_args`.
+9. `main()`.
+10. `main "$@"` as the final line.
+
+Reject generated automation scripts that skip this structure unless the script is intentionally tiny and linear.
 
 ## Error Handling Modes
 
@@ -64,6 +119,33 @@ func1() {
 Use for: Production scripts with comprehensive error handling via ERR traps.
 
 ## Advanced Patterns
+
+### Main Function for Multi-Step Automation
+
+Use `main()` once an automation script has multiple named phases. This keeps constants and function definitions separate from execution, makes the script easy to scan, and gives tests a natural set of functions to call.
+
+```bash
+main() {
+  parse_args "$@"
+  require_command curl
+  require_command git
+  require_command npm
+  resolve_env_file
+  install_dependencies_if_needed
+  build_assets
+  load_deploy_environment
+  deploy_worker_assets "$@"
+  verify_worker_hostnames
+}
+
+main "$@"
+```
+
+Keep truly tiny scripts linear. If you are adding phase comments like "parse", "validate", "deploy", or "verify", promote those phases into functions and call them from `main()`.
+
+### Know When Bash Is the Wrong Tool
+
+Use Bash for glue: calling CLIs, moving files, simple validation, CI wrappers, and deployment orchestration. Prefer Python/Go/Node when the script needs complex data structures, non-trivial JSON transformation, API clients with pagination/retry state, concurrency, long-lived daemons, or more than a few hundred lines of business logic.
 
 ### Retry with Exponential Backoff
 
@@ -165,6 +247,20 @@ length=$(echo "$var" | wc -c)
 length=${#var}
 ```
 
+### Use `awk`, `sed`, and `jq` Deliberately
+
+```bash
+# Simple string changes: prefer Bash parameter expansion
+normalized_path="${input_path//\/\//\/}"
+
+# Use awk/sed only when the operation is truly line-, column-, or regex-oriented
+awk -F',' 'NR > 1 && $3 == "active" { print $1 }' users.csv
+sed -E 's/[[:space:]]+$//' input.txt > output.txt
+
+# JSON must use jq
+jq -e '.items[] | select(.enabled == true) | .id' config.json
+```
+
 ### Use Arrays for Collections
 
 ```bash
@@ -196,12 +292,30 @@ log() {
   local level="$1"
   shift
   # UTC ISO-8601 timestamp
-  echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') [$level] $*" >&2
+  printf "%s [%s] %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$level" "$*" >&2
 }
 
 log_info() { log "INFO" "$@"; }
 log_error() { log "ERROR" "$@"; }
 log_debug() { [[ "${DEBUG:-0}" == "1" ]] && log "DEBUG" "$@" || true; }
+```
+
+### Terminal-safe ANSI colors
+
+Only emit colors for interactive terminal output. Do not write ANSI escape codes to log files.
+
+```bash
+if [[ -t 2 ]]; then
+  readonly RED=$'\033[0;31m'
+  readonly GREEN=$'\033[0;32m'
+  readonly NC=$'\033[0m'
+else
+  readonly RED=''
+  readonly GREEN=''
+  readonly NC=''
+fi
+
+log_error "${RED}Invalid input${NC}"
 ```
 
 ### Structured Error Reporting (JSON)

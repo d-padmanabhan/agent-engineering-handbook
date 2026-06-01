@@ -88,12 +88,103 @@ local var="value"           # Function-local variable
   - `set -uo pipefail` - Controlled (explicit error handling for complex scripts)
   - `set -Euo pipefail` - Strict + ERR trap propagation to functions
 - **Linting:** Must pass **`shellcheck`** with **0 errors/warnings**.
-- **Formatting:** Must pass **`shfmt -i 2 -ci -sr -bn`** (2-space indent, indent switch/case, simplify redirects, binary ops at line end).
+- **Formatting:** Must pass **`shfmt -i 2 -ci -sr -bn`** (2-space indent, indent switch/case, simplify redirects, binary ops at line end). Prefer lines around 100 characters; wrap long commands with `\`.
 - **Extension:** Use `.sh` for scripts, no extension for executables in `bin/` is acceptable if documented.
 - **Variable Naming:**
-  - **Uppercase** for constants and configuration: `readonly MAX_RETRIES=10`, `readonly CONFIG_FILE="/etc/app.conf"`
-  - **Lowercase** for local variables: `local count=0`, `local file_name="data.txt"`
-  - **Uppercase convention** helps distinguish constants from variables, avoids collisions with environment variables, and follows Bash conventions
+  - Use descriptive names. Prefer `input_file`, `source_dir`, `max_retries` over `f`, `dir`, `n`.
+  - **Uppercase** for constants, globals, and exported configuration: `readonly MAX_RETRIES=10`, `readonly CONFIG_FILE="/etc/app.conf"`.
+  - **Lowercase** for local variables inside functions: `local count=0`, `local file_name="data.txt"`.
+  - **Uppercase convention** helps distinguish constants from variables, avoids collisions with environment variables, and follows Bash conventions.
+- **Parameter Expansion:** Prefer braces around variables (`"${VAR}"`, `"${array[@]}"`) to make variable boundaries explicit.
+- **Quoting:** Quote variable expansions by default: `"${VAR}"`. Leave unquoted only when word splitting or glob expansion is intentional and documented.
+
+### Standard header + prelude
+
+Use this shape for new scripts. It matches the preferred documentation block, keeps `set -x` available but commented, enables strict mode, and creates a timestamped logfile named after the script.
+
+```bash
+#!/usr/bin/env bash
+#
+# Script Name         : <script_name>.sh
+#
+# Purpose             : <One or two sentences explaining what the script does.
+#                       Wrap continuation lines under the value column.>
+#
+# Dependencies        : <List required commands, or "None">
+#
+# Script Usage        : ./<script_name>.sh [options] <arguments>
+#
+#                       <Examples and argument notes.>
+#
+##----------------------------------------------------------------------------------------##
+# Turn debug on or off
+# set -x
+##----------------------------------------------------------------------------------------##
+
+set -euo pipefail
+
+readonly DTTM="$(date -u +"%Y%m%d_%H%M%S")"
+readonly SCRIPT_NAME="$(basename "${0}" .sh)"
+readonly LOGFILE="${SCRIPT_NAME}_${DTTM}.log"
+
+logmsg() {
+  local timestamp
+  timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  printf "%s: %s\n" "${timestamp}" "$*" | tee -a "${LOGFILE}" >&2
+}
+```
+
+Notes:
+
+- Prefer `#!/usr/bin/env bash` for portability. Use `#!/bin/bash` only when the runtime path is fixed and documented.
+- Do not enable `set -x` by default; it can leak secrets. Keep it commented and enable only during local debugging.
+- Use `printf` instead of `echo` in logging helpers. `echo` has portability edge cases with `-n`, backslashes, and implementation-specific behavior.
+- Do not `export` `DTTM`, `SCRIPT_NAME`, or `LOGFILE` unless child processes need them. `readonly` is enough for script constants.
+- Use UTC timestamps so logs from CI, servers, and laptops are comparable.
+
+### Generation contract for non-trivial scripts
+
+For scripts longer than a tiny one-shot (roughly more than 10-15 lines, more than one command phase, argument parsing, tool validation, config resolution, deployment, or verification), generated Bash MUST follow this shape:
+
+1. Header block.
+2. Debug toggle comment (`# set -x`), disabled by default.
+3. Strict or controlled mode (`set -euo pipefail` or `set -uo pipefail` with explicit error handling).
+4. Readonly constants and logfile setup.
+5. Logging helpers (`logmsg`, `die`, and optional `debug`).
+6. Dependency checks (`require_command`).
+7. Pure helper functions with lowercase locals.
+8. `parse_args`.
+9. `main()` as the only execution entry point.
+10. `main "$@"` as the final line.
+
+Anything else is a review finding unless the script is intentionally tiny and linear.
+
+```bash
+require_command() {
+  local command_name="$1"
+  command -v "${command_name}" >/dev/null 2>&1 || die "Missing command: ${command_name}"
+}
+
+parse_args() {
+  # Parse "$@" and set globals or print usage.
+  :
+}
+
+main() {
+  parse_args "$@"
+  require_command curl
+  require_command jq
+  resolve_config
+  do_work
+  verify_result
+}
+
+main "$@"
+```
+
+### When Bash is the wrong tool
+
+Use Bash for glue: calling CLIs, moving files, simple validation, CI wrappers, and deployment orchestration. Prefer Python/Go/Node when the script needs complex data structures, non-trivial JSON transformation, API clients with pagination/retry state, concurrency, long-lived daemons, or more than a few hundred lines of business logic.
 
 ---
 
@@ -328,6 +419,27 @@ name="${file##*/}"
 - **Native Operations:** Prefer `${var//old/new}` over `echo "$var" | sed 's/old/new/g'`.
 - **Caching:** Cache expensive command results, avoid repeated calls.
 - **Early Returns:** Exit early to avoid unnecessary processing.
+- **Text processing:** Use shell builtins for simple string operations. Use `awk` / `sed` only when the transformation is genuinely line-oriented, column-oriented, or regex-heavy enough to justify the external dependency.
+- **JSON processing:** Use `jq` for JSON parsing, filtering, and validation. Do not parse JSON with `grep`, `sed`, or shell string splitting.
+
+### Text and JSON processing
+
+```bash
+# GOOD: simple replacement with Bash parameter expansion
+normalized_path="${input_path//\/\//\/}"
+
+# GOOD: column-oriented text processing belongs in awk
+awk -F',' 'NR > 1 && $3 == "active" { print $1 }' users.csv
+
+# GOOD: regex-heavy line edits can be clearer with sed
+sed -E 's/[[:space:]]+$//' input.txt > output.txt
+
+# GOOD: JSON must use jq
+jq -e '.users[] | select(.active == true) | .id' users.json
+
+# BAD: do not parse JSON with grep/sed
+grep '"id"' users.json | sed 's/.*"id": "\(.*\)".*/\1/'
+```
 
 ---
 
@@ -336,6 +448,7 @@ name="${file##*/}"
 - **Standard Logging:** Use a helper function with UTC timestamps.
 - **Level:** INFO, WARN, ERROR.
 - **Output:** Stdout for info, Stderr for errors/logs.
+- **Colors:** Use ANSI colors only for interactive terminal output (`[[ -t 2 ]]`). Do not emit color escape codes to log files or non-terminal output.
 
 ```bash
 log() {
@@ -343,6 +456,26 @@ log() {
   shift
   # UTC ISO-8601-like timestamp
   echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') [$level] $*" >&2
+}
+```
+
+**Terminal-safe colors:**
+
+```bash
+if [[ -t 2 ]]; then
+  readonly RED=$'\033[0;31m'
+  readonly GREEN=$'\033[0;32m'
+  readonly YELLOW=$'\033[1;33m'
+  readonly NC=$'\033[0m'
+else
+  readonly RED=''
+  readonly GREEN=''
+  readonly YELLOW=''
+  readonly NC=''
+fi
+
+log_error() {
+  logmsg "${RED}ERROR:${NC} $*"
 }
 ```
 
@@ -383,6 +516,31 @@ fi
 - **Functions:** Use `function_name() { ... }` style.
 - **Locals:** Use `local` keyword for variables inside functions.
 - **Usage:** Provide a `usage()` function for help text.
+
+### Main function threshold
+
+Use `main()` once a script has more than trivial linear execution. It is required when the script has multiple steps such as parsing arguments, validating tools, resolving configuration, building artifacts, deploying, and verifying results.
+
+Why: `main()` keeps globals and function definitions separate from execution, gives reviewers a readable table of contents for the script, and makes future testing / refactoring easier.
+
+```bash
+main() {
+  parse_args "$@"
+  require_command curl
+  require_command git
+  require_command npm
+  resolve_env_file
+  install_dependencies_if_needed
+  build_assets
+  load_deploy_environment
+  deploy_worker_assets "$@"
+  verify_worker_hostnames
+}
+
+main "$@"
+```
+
+Tiny one-shot scripts with 3-5 obvious lines may remain linear. As soon as the script grows named phases, add `main()` before adding more top-level execution.
 
 ### Variable Declaration: `local`, `declare`/`typeset`, `readonly`, `export`
 
@@ -934,14 +1092,19 @@ fi
 
 ## 11) Anti-Patterns (Forbidden)
 
--  `eval` on user input.
--  Using unquoted variables in file paths.
--  Parsing `ls` output (use `find` or globs).
--  Swallowing errors (unless explicit `|| true`).
--  `echo` for logging (use specific log function targeting stderr).
--  `cd` without error checking before destructive operations.
--  Variables in pipes (use process substitution `< <(cmd)` instead).
--  Using aliases in scripts (use functions instead).
+- `eval` on user input.
+- Using unquoted variables in file paths.
+- Parsing `ls` output (use `find` or globs).
+- Swallowing errors (unless explicit `|| true` with a comment explaining why failure is acceptable).
+- `echo` for logging (use `logmsg` / `log` backed by `printf`, UTC timestamps, and stderr).
+- `cd` without error checking before destructive operations.
+- Variables in pipes (use process substitution `< <(cmd)` instead).
+- Using aliases in scripts (use functions instead).
+- New non-trivial scripts with top-level execution instead of `main "$@"`.
+- Enabled `set -x` committed by default (debug traces can leak secrets).
+- JSON parsed with `grep`, `sed`, `cut`, `awk`, or shell string splitting instead of `jq`.
+- Global variables mutated inside functions without a clear reason; prefer locals and explicit return values.
+- Destructive commands (`rm`, `mv`, `chmod`, cloud delete commands) before validating target path, environment, and dry-run/confirmation behavior.
 
 ---
 
@@ -1665,4 +1828,3 @@ fi
 - ✅ Cross-platform compatibility
 
 ---
-

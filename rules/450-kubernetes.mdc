@@ -495,6 +495,59 @@ metadata:
     pod-security.kubernetes.io/warn: restricted
 ```
 
+### Privileged Pods and Host Namespaces
+
+`privileged: true` and host namespace sharing (`hostPID: true`, `hostIPC: true`, `hostNetwork: true`) are **forbidden by default** for application workloads.
+
+Why this matters:
+
+- `privileged: true` grants broad kernel and device access and disables most container isolation.
+- `hostPID: true` lets the pod see node-level processes, which is a common prerequisite for host inspection and tampering.
+- `hostIPC: true` exposes host inter-process communication primitives.
+- `hostNetwork: true` places the pod directly on the node network namespace and bypasses normal pod-network isolation assumptions.
+
+Reject manifests like this for normal applications:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  hostPID: true
+  containers:
+    - name: test
+      image: busybox:1.36
+      securityContext:
+        privileged: true
+```
+
+Use the restricted baseline instead:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: example/app:1.0.0
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+```
+
+Narrow exceptions exist for node-level agents and diagnostics: CNI / CSI components, eBPF observability, runtime security agents, node problem detectors, and short-lived break-glass debugging. Every exception must be explicitly documented with owner, reason, namespace, service account, RBAC scope, runtime duration, and review date. Prefer a dedicated namespace, a DaemonSet when node coverage is required, tight tolerations / node selectors, and admission-policy allowlists rather than broad cluster-wide exemptions.
+
 ### RBAC
 
 ```yaml
@@ -1136,4 +1189,3 @@ When reviewing Kubernetes code, check:
 - [ ] Finalizers used for cleanup
 - [ ] Events recorded for debugging
 ---
-
