@@ -104,7 +104,7 @@ CMD ["node", "dist/index.js"]
 
 ```dockerfile
 # Pin versions
-FROM python:3.12.1-slim-bookworm
+FROM python:3.14.0-slim-bookworm
 
 # Run as non-root
 RUN useradd -m appuser

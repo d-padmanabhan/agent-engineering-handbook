@@ -256,7 +256,7 @@ Resources:
   rCustomResourceFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: python3.14
       Handler: index.handler
       Role: !GetAtt rLambdaExecutionRole.Arn
       Code:
@@ -509,8 +509,8 @@ Parameters:
 
   pAllowedCidr:
     Type: String
-    Default: 0.0.0.0/0
-    Description: CIDR block allowed to access resources
+    Default: 203.0.113.0/24
+    Description: Approved admin/VPN egress CIDR block allowed to access resources
 
 Mappings:
   mEnvironmentMap:

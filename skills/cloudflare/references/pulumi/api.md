@@ -56,7 +56,9 @@ db.id.apply(async (dbId) => {
         {method: "POST", headers: {"Authorization": `Bearer ${apiToken}`, "Content-Type": "application/json"},
          body: JSON.stringify({sql: "CREATE TABLE users (id INT)"})}
     );
-    return response.json();
+    if (!response.ok) throw new Error(`D1 query failed: HTTP ${response.status}`);
+    const data: unknown = await response.json();
+    return data;
 });
 ```
 

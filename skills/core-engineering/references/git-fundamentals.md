@@ -109,9 +109,9 @@ git fetch origin --prune && git switch -c feat/your-feature origin/main
 
 **Use when:** Creating throwaway branches or when local `main` is messy.
 
-## Sync with remote, then push (branch-agnostic)
+## Sync with remote, then push (REQUIRED before every push)
 
-When pushing after a local commit, sync with the remote first so the push is not rejected. Use the **current branch** so the same command works on `main` or any feature branch. See **130-git.mdc** (Fetch, Pull & Sync Patterns) for full detail.
+**Always sync the current branch with its remote immediately before pushing to an existing remote branch** - pushing stale history triggers non-fast-forward rejections and tempts a history-clobbering `--force`. Use **pull with rebase** on the **current branch** so the same command works on `main` or any feature branch. See **130-git.mdc** (Sync with remote, then push) for full detail.
 
 ```bash
 git pull origin $(git branch --show-current) --rebase
@@ -119,3 +119,5 @@ git push origin $(git branch --show-current)
 ```
 
 One-liner: `git pull origin $(git branch --show-current) --rebase; git push origin $(git branch --show-current)`
+
+Only exception - a brand-new branch with no upstream yet (nothing to pull): `git push -u origin HEAD`.

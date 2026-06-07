@@ -37,7 +37,10 @@ Turnstile is a user-friendly CAPTCHA alternative that runs challenges in the bac
 <script>
 window.turnstile.render('#turnstile-container', {
   sitekey: 'YOUR_SITE_KEY',
-  callback: (token) => console.log('Token:', token)
+  callback: (token) => {
+    // Do not log Turnstile tokens. Send the token to the server for validation.
+    submitTurnstileToken(token);
+  }
 });
 </script>
 ```
@@ -61,8 +64,11 @@ export default {
       })
     });
 
+    if (!result.ok) {
+      return new Response('CAPTCHA validation unavailable', { status: 502 });
+    }
     const validation = await result.json();
-    if (!validation.success) {
+    if (typeof validation !== 'object' || validation === null || validation.success !== true) {
       return new Response('Invalid CAPTCHA', { status: 400 });
     }
     // Process form...

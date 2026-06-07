@@ -135,6 +135,33 @@ Libraries published to PyPI or shipped to external customers MAY target a lower 
 - CI workflow using `python-version: '3.13'`, `'3.12'`, `'3.11'`, or older for a new app / service / Lambda
 - `runtime = "python3.13"` (or older) in Lambda / serverless configuration for a new function
 
+### NN-2: Leading underscores mean non-public API
+
+Do not prefix functions, methods, classes, variables, modules, or packages with `_` unless they are intentionally non-public implementation details. A leading underscore is a contract with readers and tools: "this is internal; don't import or call it from outside this module/package."
+
+Use public names for public behavior:
+
+```python
+# GOOD: public API, public name
+def validate_order(order: Order) -> None:
+    ...
+
+
+# GOOD: internal helper, module-private name
+def _normalize_order_id(raw_order_id: str) -> str:
+    ...
+```
+
+**Reject in review:**
+
+- `_process_data()`, `_validate_input()`, or `_build_payload()` called directly from other modules
+- Public classes or modules named `_Client`, `_Service`, `_helpers`, or similar without being intentionally internal
+- Double-underscore methods (`__method`) unless name-mangling is intentionally required to avoid subclass collisions
+- Invented dunder names such as `__process__` or `__validate__` in application code
+- Leading underscore added "because it looks cleaner" or because the function is merely small
+
+If a helper starts internal but becomes reused across modules, promote it to a public name or move it behind a clearer public API. Do not leak private-looking names into callers.
+
 ## 0) AI Assistant Guidelines
 
 When providing code assistance, follow these guardrails:

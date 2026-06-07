@@ -35,7 +35,12 @@ async function auth(ctx: EventContext<Env>) {
   if (!token) return new Response('Unauthorized', { status: 401 });
   const session = await ctx.env.KV.get(`session:${token}`);
   if (!session) return new Response('Invalid', { status: 401 });
-  ctx.data.user = JSON.parse(session);
+  try {
+    const user: unknown = JSON.parse(session);
+    ctx.data.user = user;
+  } catch {
+    return new Response('Invalid session', { status: 401 });
+  }
   return ctx.next();
 }
 ```
@@ -68,7 +73,10 @@ async function rateLimit(ctx: EventContext<Env>) {
 // JSON & file upload
 export async function onRequestPost(ctx) {
   const ct = ctx.request.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return Response.json(await ctx.request.json());
+  if (ct.includes('application/json')) {
+    const body = await ctx.request.json() as unknown;
+    return Response.json(body);
+  }
   if (ct.includes('multipart/form-data')) {
     const file = (await ctx.request.formData()).get('file') as File;
     await ctx.env.BUCKET.put(file.name, file.stream());

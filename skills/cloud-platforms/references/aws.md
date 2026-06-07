@@ -1006,7 +1006,7 @@ resource "aws_lambda_provisioned_concurrency_config" "api" {
 # Reserved concurrency to prevent overconsumption
 resource "aws_lambda_function" "api" {
   function_name = "api-handler"
-  runtime       = "python3.12"
+  runtime       = "python3.14"
   handler       = "index.handler"
 
   reserved_concurrent_executions = 100  # Limit concurrent executions

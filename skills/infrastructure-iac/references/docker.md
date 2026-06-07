@@ -4,7 +4,7 @@
 
 ```dockerfile
 # Build stage
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Production stage
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 COPY --from=builder /root/.local /root/.local
@@ -33,7 +33,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0"]
 ## Multi-Stage Build (Go)
 
 ```dockerfile
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -71,7 +71,7 @@ RUN addgroup --system appgroup && \
 USER appuser
 
 # Read-only filesystem
-FROM python:3.12-slim
+FROM python:3.14-slim
 # ... build steps ...
 USER appuser
 # Run with: docker run --read-only --tmpfs /tmp

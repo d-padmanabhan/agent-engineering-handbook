@@ -27,7 +27,10 @@
 <script>
 let widgetId = window.turnstile.render('#container', {
   sitekey: 'YOUR_SITE_KEY',
-  callback: (token) => console.log('Token:', token)
+  callback: (token) => {
+    // Do not log Turnstile tokens.
+    submitButton.disabled = !token;
+  }
 });
 
 form.addEventListener('submit', async (e) => {
@@ -116,9 +119,12 @@ export default {
       })
     });
 
+    if (!result.ok) {
+      return new Response('CAPTCHA validation unavailable', { status: 502 });
+    }
     const validation = await result.json();
 
-    if (!validation.success) {
+    if (typeof validation !== 'object' || validation === null || validation.success !== true) {
       return new Response('CAPTCHA validation failed', { status: 403 });
     }
 

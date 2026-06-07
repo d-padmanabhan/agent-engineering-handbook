@@ -1028,13 +1028,12 @@ Rating (1-10):"""
 
 ```python
 import pytest
-from typing import List, Dict
 
 class LLMEvaluator:
-    def __init__(self, test_cases: List[Dict]):
+    def __init__(self, test_cases: list[dict]):
         self.test_cases = test_cases
 
-    def run_evaluation(self) -> Dict[str, float]:
+    def run_evaluation(self) -> dict[str, float]:
         """Run full evaluation suite."""
         results = {
             "total": len(self.test_cases),

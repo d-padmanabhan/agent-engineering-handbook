@@ -176,6 +176,120 @@ func TestAdd(t *testing.T) {
 }
 ```
 
+### Generation Contract (Non-Negotiable)
+
+For new Go services, CLIs, Lambdas, and long-lived packages, generated code MUST follow these constraints:
+
+1. Keep application wiring at the composition root (`cmd/<app>/main.go`); package code exposes constructors and small interfaces.
+2. Accept `context.Context` as the first parameter for request-scoped, network, storage, or long-running work.
+3. Return errors instead of panicking for normal failures; wrap with `%w` and handle with `errors.Is` / `errors.As`.
+4. Inject dependencies (`*http.Client`, `*slog.Logger`, DB clients, repositories) instead of using hidden globals.
+5. Avoid side-effectful `init()` functions except tiny, deterministic registration cases; never perform network, filesystem, or credential loading in `init()`.
+6. Keep test helpers in `*_test.go`.
+7. Include table-driven tests and run `go test -race ./...`.
+
+Reject generated Go that skips these constraints for non-trivial code.
+
+### NN-1: Inbound HTTP servers are hardened by default
+
+Production HTTP servers MUST use an explicit `http.Server` with timeouts. Do not call `http.ListenAndServe(...)` directly in production code.
+
+```go
+srv := &http.Server{
+    Addr:              ":8080",
+    Handler:           router,
+    ReadHeaderTimeout: 5 * time.Second,
+    ReadTimeout:       15 * time.Second,
+    WriteTimeout:      30 * time.Second,
+    IdleTimeout:       60 * time.Second,
+    MaxHeaderBytes:    1 << 20, // 1 MiB
+}
+```
+
+Handlers that read request bodies MUST bound them before decode:
+
+```go
+func createUser(w http.ResponseWriter, r *http.Request) {
+    r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB
+    defer r.Body.Close()
+
+    dec := json.NewDecoder(r.Body)
+    dec.DisallowUnknownFields()
+
+    var req CreateUserRequest
+    if err := dec.Decode(&req); err != nil {
+        http.Error(w, "invalid request body", http.StatusBadRequest)
+        return
+    }
+}
+```
+
+**Reject in review:**
+
+- `http.ListenAndServe(...)` / `http.ListenAndServeTLS(...)` used directly in production services
+- `http.Server{}` without `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout`
+- JSON API handlers without `http.MaxBytesReader`
+- JSON decoders for public APIs that do not call `DisallowUnknownFields()`
+- detailed internal errors returned to users instead of generic 5xx responses plus structured logs
+- wildcard CORS (`*`) on credentialed or private APIs
+
+### NN-2: Outbound HTTP clients are explicit and bounded
+
+Production code MUST inject or construct an explicit `*http.Client` with a timeout and transport settings. Avoid package-level default clients.
+
+```go
+func NewHTTPClient() *http.Client {
+    return &http.Client{
+        Timeout: 30 * time.Second,
+        Transport: &http.Transport{
+            Proxy:                 http.ProxyFromEnvironment,
+            DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+            TLSHandshakeTimeout:   5 * time.Second,
+            ResponseHeaderTimeout: 10 * time.Second,
+            ExpectContinueTimeout: 1 * time.Second,
+            IdleConnTimeout:       90 * time.Second,
+            MaxIdleConns:          100,
+            MaxIdleConnsPerHost:   10,
+        },
+    }
+}
+```
+
+**Reject in review:**
+
+- `http.Get`, `http.Post`, `http.Head`, or `http.DefaultClient` in production service code
+- `http.Client{}` without `Timeout`
+- retries that ignore `ctx.Done()`
+- `io.ReadAll(resp.Body)` on network responses without `io.LimitReader` or equivalent bound
+
+### NN-3: Module and toolchain are pinned
+
+New modules MUST declare the intended Go line and toolchain in `go.mod`, and CI MUST run module hygiene checks.
+
+```go
+module example.com/app
+
+go 1.25
+
+toolchain go1.25.0
+```
+
+CI must include:
+
+```bash
+go mod tidy
+go mod verify
+go test -race ./...
+govulncheck ./...
+```
+
+**Reject in review:**
+
+- missing `go` directive in `go.mod`
+- unexplained committed `replace` directives
+- private modules without documented `GOPRIVATE` / `GONOSUMDB`
+- CI that never runs `go mod tidy` / `go mod verify`
+
 ---
 
 ## 1. Correctness & Safety First
@@ -333,10 +447,14 @@ tlsConfig := &tls.Config{
 _, err := db.ExecContext(ctx, "INSERT INTO users (email) VALUES ($1)", email)
 ```
 
-### HTTP Client Hardening (MUST)
+### HTTP/API Hardening (MUST)
 
-When calling network APIs (internal or external), apply these non-negotiable checks:
+When serving or calling network APIs (internal or external), apply these non-negotiable checks:
 
+- **MUST** use explicit `http.Server` timeouts for inbound servers (see NN-1).
+- **MUST** bound inbound request bodies with `http.MaxBytesReader` before JSON decode.
+- **MUST** reject unknown fields for public JSON APIs with `Decoder.DisallowUnknownFields()`.
+- **MUST** use explicit `*http.Client` values with timeouts and transport settings (see NN-2).
 - **MUST** bound response body reads before `io.ReadAll` / decode.
 - **MUST** cap server-provided retry hints (for example `Retry-After`) to a configured maximum.
 - **MUST** keep "raw"/"escape hatch" API naming and docs aligned with actual behavior.
@@ -1327,6 +1445,7 @@ func TestUserService_GetUser(t *testing.T) {
 **Integration Tests:**
 
 ```go
+//go:build integration
 // +build integration
 
 package integration
@@ -1464,6 +1583,24 @@ repos:
 
 ```yaml
 rules:
+  - id: go-direct-listen-and-serve
+    message: "Use an explicit http.Server with timeouts instead of http.ListenAndServe directly"
+    severity: ERROR
+    languages: [go]
+    pattern-either:
+      - pattern: http.ListenAndServe(...)
+      - pattern: http.ListenAndServeTLS(...)
+
+  - id: go-default-http-client
+    message: "Inject or construct an explicit *http.Client with timeouts; do not use default clients in services"
+    severity: WARNING
+    languages: [go]
+    pattern-either:
+      - pattern: http.Get(...)
+      - pattern: http.Post(...)
+      - pattern: http.Head(...)
+      - pattern: http.DefaultClient
+
   - id: go-unbounded-network-readall
     message: "Bound network body reads with io.LimitReader or MaxBytesReader"
     severity: ERROR
@@ -1512,7 +1649,7 @@ rules:
 When adding a new Go hardening guardrail, update both the rule and skill
 layers so guidance and enforcement stay aligned:
 
-1. Add the normative requirement under **HTTP Client Hardening (MUST)** in this
+1. Add the normative requirement under **HTTP/API Hardening (MUST)** in this
    file (`rules/210-go.mdc`).
 2. Add/extend a detection rule in the sample semgrep section (and in your repo's
    actual `.semgrep/go-hardening.yaml` if present).
@@ -1863,11 +2000,24 @@ go tool pprof mem.prof
 **HTTP Profiling:**
 
 ```go
-import _ "net/http/pprof"
+import (
+    "log"
+    "net/http"
+    _ "net/http/pprof"
+    "time"
+)
 
 func main() {
     go func() {
-        log.Println(http.ListenAndServe("localhost:6060", nil))
+        srv := &http.Server{
+            Addr:              "localhost:6060",
+            Handler:           http.DefaultServeMux,
+            ReadHeaderTimeout: 5 * time.Second,
+            ReadTimeout:       15 * time.Second,
+            WriteTimeout:      30 * time.Second,
+            IdleTimeout:       60 * time.Second,
+        }
+        log.Println(srv.ListenAndServe())
     }()
     // Application code...
 }
@@ -2145,25 +2295,14 @@ func (rl *RateLimiter) Wait(ctx context.Context) error {
 ```go
 import (
     "context"
+    "fmt"
+
+    "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/s3"
-    "github.com/aws/aws-sdk-go-v2/aws"
 )
 
-// GOOD: Create clients in global scope (Lambda) or at application startup
-var s3Client *s3.Client
-
-func init() {
-    cfg, err := config.LoadDefaultConfig(context.TODO(),
-        config.WithRegion("us-east-1"),
-    )
-    if err != nil {
-        panic(fmt.Errorf("failed to load AWS config: %w", err))
-    }
-    s3Client = s3.NewFromConfig(cfg)
-}
-
-// GOOD: Client factory with retry configuration
+// GOOD: Create clients at application startup and pass them explicitly.
 func NewS3Client(ctx context.Context, region string) (*s3.Client, error) {
     cfg, err := config.LoadDefaultConfig(ctx,
         config.WithRegion(region),
@@ -2186,6 +2325,8 @@ import (
 )
 
 func GetObject(ctx context.Context, client *s3.Client, bucket, key string) ([]byte, error) {
+    const maxObjectReadBytes = 10 << 20 // 10 MiB safety bound
+
     result, err := client.GetObject(ctx, &s3.GetObjectInput{
         Bucket: aws.String(bucket),
         Key:    aws.String(key),
@@ -2205,7 +2346,14 @@ func GetObject(ctx context.Context, client *s3.Client, bucket, key string) ([]by
     }
     defer result.Body.Close()
 
-    return io.ReadAll(result.Body)
+    body, err := io.ReadAll(io.LimitReader(result.Body, maxObjectReadBytes+1))
+    if err != nil {
+        return nil, fmt.Errorf("read object body: %w", err)
+    }
+    if len(body) > maxObjectReadBytes {
+        return nil, fmt.Errorf("object body exceeds %d bytes", maxObjectReadBytes)
+    }
+    return body, nil
 }
 ```
 
@@ -2240,16 +2388,14 @@ func ListObjects(ctx context.Context, client *s3.Client, bucket string) ([]strin
 ```go
 import (
     "context"
+    "log"
+
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
-
-var dynamoClient *dynamodb.Client
-
-func init() {
-    cfg, _ := config.LoadDefaultConfig(context.TODO())
-    dynamoClient = dynamodb.NewFromConfig(cfg)
-}
 
 type Event struct {
     UserID string `json:"user_id"`
@@ -2260,23 +2406,30 @@ type Response struct {
     Body       string `json:"body"`
 }
 
-func handler(ctx context.Context, event Event) (Response, error) {
-    // Use global client
-    result, err := dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-        TableName: aws.String("users"),
-        Key: map[string]types.AttributeValue{
-            "id": &types.AttributeValueMemberS{Value: event.UserID},
-        },
-    })
-    if err != nil {
-        return Response{StatusCode: 500, Body: "Internal error"}, err
-    }
+func handler(client *dynamodb.Client) func(context.Context, Event) (Response, error) {
+    return func(ctx context.Context, event Event) (Response, error) {
+        result, err := client.GetItem(ctx, &dynamodb.GetItemInput{
+            TableName: aws.String("users"),
+            Key: map[string]types.AttributeValue{
+                "id": &types.AttributeValueMemberS{Value: event.UserID},
+            },
+        })
+        if err != nil {
+            return Response{StatusCode: 500, Body: "Internal error"}, err
+        }
+        _ = result // Build the real response from result.Item.
 
-    return Response{StatusCode: 200, Body: "Success"}, nil
+        return Response{StatusCode: 200, Body: "Success"}, nil
+    }
 }
 
 func main() {
-    lambda.Start(handler)
+    ctx := context.Background()
+    cfg, err := config.LoadDefaultConfig(ctx)
+    if err != nil {
+        log.Fatalf("load AWS config: %v", err)
+    }
+    lambda.Start(handler(dynamodb.NewFromConfig(cfg)))
 }
 ```
 
@@ -2782,7 +2935,7 @@ go build -ldflags "-s -w" -o myapp ./cmd/myapp
 
 ```dockerfile
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 
 WORKDIR /build
 
@@ -2796,24 +2949,16 @@ COPY . .
 # Build binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o myapp ./cmd/myapp
 
-# Runtime stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
+# Runtime stage - distroless + nonroot
+FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
-
-# Copy binary from builder
-COPY --from=builder /build/myapp .
-
-# Run as non-root user
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
-USER appuser
+COPY --from=builder /build/myapp /app/myapp
+USER nonroot:nonroot
 
 EXPOSE 8080
 
-CMD ["./myapp"]
+CMD ["/app/myapp"]
 ```
 
 ### CI/CD with GitHub Actions
@@ -3284,25 +3429,32 @@ func setupLogger(level string) *slog.Logger {
 ## Anti-Patterns (Automatic Rejection)
 
 ### Critical
--  Panic/recover as control flow ("Don't panic" - use errors for normal error handling)
--  Goroutines without lifecycle management
--  Swallowed errors ("Don't just check errors, handle them gracefully")
--  Global mutable state
--  Unbounded network body reads (`io.ReadAll` without limit on response bodies)
--  Uncapped server-derived retry/sleep delays (`Retry-After` without max cap)
--  Logging secrets/PII
--  Zero values that require initialization to be safe ("Make the zero value useful")
--  Test-only helper code in non-`*_test.go` files
+
+- Panic/recover as control flow ("Don't panic" - use errors for normal error handling)
+- Goroutines without lifecycle management
+- Swallowed errors ("Don't just check errors, handle them gracefully")
+- Global mutable state
+- Unbounded network body reads (`io.ReadAll` without limit on response bodies)
+- Inbound HTTP servers without explicit timeouts (`ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`)
+- JSON API handlers that decode request bodies without `http.MaxBytesReader`
+- Production code using `http.Get` / `http.Post` / `http.DefaultClient` instead of injected bounded clients
+- Uncapped server-derived retry/sleep delays (`Retry-After` without max cap)
+- Logging secrets/PII
+- Zero values that require initialization to be safe ("Make the zero value useful")
+- Test-only helper code in non-`*_test.go` files
+- Side-effectful `init()` functions that load config, credentials, files, or network clients
+- Missing `go` directive / unexplained `replace` directives in `go.mod`
 
 ### Code Smells
--  Channels for simple mutual exclusion (use mutexes)
--  Reflection/unsafe without benchmarks ("Reflection is never clear")
--  "God" interfaces ("The bigger the interface, the weaker the abstraction")
--  Premature abstraction ("A little copying is better than a little dependency")
--  Missing context propagation
--  Using `interface{}` when generics or specific types would work ("interface{} says nothing")
--  Clever code over clear code ("Clear is better than clever")
--  Zero values that require initialization to be safe ("Make the zero value useful")
+
+- Channels for simple mutual exclusion (use mutexes)
+- Reflection/unsafe without benchmarks ("Reflection is never clear")
+- "God" interfaces ("The bigger the interface, the weaker the abstraction")
+- Premature abstraction ("A little copying is better than a little dependency")
+- Missing context propagation
+- Using `interface{}` when generics or specific types would work ("interface{} says nothing")
+- Clever code over clear code ("Clear is better than clever")
+- Zero values that require initialization to be safe ("Make the zero value useful")
 
 ---
 

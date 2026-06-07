@@ -125,10 +125,20 @@ die() {
   exit 1
 }
 
+debug() {
+  [[ "${DEBUG:-0}" == "1" ]] && logmsg "DEBUG: $*"
+}
+
+require_command() {
+  local command_name="$1"
+  command -v "${command_name}" >/dev/null 2>&1 || die "Missing command: ${command_name}"
+}
+
 main() {
   local arg="${1:-}"
   [[ -z "${arg}" ]] && die "Usage: ${SCRIPT_NAME} <argument>"
 
+  require_command jq
   logmsg "Processing: ${arg}"
   # Main logic here
 }
@@ -191,8 +201,15 @@ else
   readonly NC=''
 fi
 
-logmsg "${GREEN}Starting job${NC}"
-logmsg "${RED}Invalid input${NC}"
+if [[ -n "${GREEN}" ]]; then
+  printf "%sStarting job%s\n" "${GREEN}" "${NC}" >&2
+fi
+logmsg "Starting job"
+
+if [[ -n "${RED}" ]]; then
+  printf "%sInvalid input%s\n" "${RED}" "${NC}" >&2
+fi
+logmsg "Invalid input"
 ```
 
 ### Use Functions

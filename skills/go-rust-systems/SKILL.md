@@ -87,10 +87,21 @@ Prefer **`switch`** for multi-way dispatch on one expression (and type switches)
 For HTTP/API client code, always apply the hardening checks from
 `rules/210-go.mdc`:
 
+- Use explicit `http.Server` values with `ReadHeaderTimeout`, `ReadTimeout`,
+  `WriteTimeout`, and `IdleTimeout`; do not call `http.ListenAndServe`
+  directly in production services.
+- Bound inbound request bodies with `http.MaxBytesReader` before JSON decode.
+- Use `Decoder.DisallowUnknownFields()` for public JSON APIs.
+- Inject or construct explicit `*http.Client` values with timeouts and
+  transport settings; do not use `http.Get`, `http.Post`, or
+  `http.DefaultClient` in production services.
 - Bound response reads before `io.ReadAll`
 - Cap `Retry-After` and server-derived delays
 - Avoid exported mutable policy/guardrail registries
 - Keep test helpers in `*_test.go`
+- Avoid side-effectful `init()`; perform app wiring in `cmd/<app>/main.go`
+- Keep `go.mod` module/toolchain pinned and run `go mod tidy` / `go mod verify`
+  in CI
 
 Use semgrep + pre-commit checks for these patterns because standard linting
 does not catch all of them reliably.

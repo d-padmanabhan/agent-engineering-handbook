@@ -165,10 +165,7 @@ This is the same security pattern as AWS IAM OIDC trust from GitHub - covered in
 ## Secrets management in CI
 
 ```bash
-# CI pattern: pipe a CI secret to wrangler secret put
-echo "$DATABASE_URL" | wrangler secret put DATABASE_URL --env production
-
-# Or use --secret-file with a path
+# CI pattern: read from a protected file or use secret bulk. Do not echo secrets.
 wrangler secret put DATABASE_URL --env production < /run/secrets/database_url
 ```
 
@@ -179,7 +176,7 @@ wrangler secret put DATABASE_URL --env production < /run/secrets/database_url
 3. Wait one isolate-lifetime (~30s) for caches to drain
 4. Revoke the old secret at the provider
 
-Never store secrets in `vars`, `.dev.vars` (committed), or environment variables in CI logs. The pattern above never echoes the secret value into the log.
+Never store secrets in `vars`, committed `.dev.vars`, CLI arguments, or CI logs. The pattern above avoids echoing the secret value.
 
 ---
 

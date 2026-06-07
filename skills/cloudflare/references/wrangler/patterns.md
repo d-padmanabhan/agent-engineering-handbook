@@ -25,7 +25,7 @@ Debug: chrome://inspect → Configure → localhost:9229
 
 ```bash
 # Production
-echo "secret-value" | wrangler secret put SECRET_KEY
+wrangler secret put SECRET_KEY < /run/secrets/secret_key
 
 # Local: use .dev.vars (gitignored)
 # SECRET_KEY=local-dev-key

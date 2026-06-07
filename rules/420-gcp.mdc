@@ -26,11 +26,13 @@ files:
 ## GCP Resource Naming Convention
 
 ### Standard Format
+
 ```
 {resource-type}-{project}-{environment}-{region}-{instance}
 ```
 
 ### Examples
+
 ```bash
 # Compute Instance
 vm-webapp-prod-us-central1-001
@@ -59,6 +61,7 @@ vpc-webapp-prod
 ## Terraform for GCP
 
 ### Provider Configuration
+
 ```hcl
 # versions.tf
 terraform {
@@ -93,6 +96,7 @@ provider "google-beta" {
 ```
 
 ### Cloud Run Service
+
 ```hcl
 # cloud-run.tf
 resource "google_cloud_run_v2_service" "webapp" {
@@ -183,6 +187,7 @@ output "cloud_run_url" {
 ```
 
 ### Cloud Storage Bucket
+
 ```hcl
 resource "google_storage_bucket" "webapp_storage" {
   name          = "${var.project_id}-${var.environment}-storage"
@@ -234,6 +239,7 @@ resource "google_storage_bucket_iam_member" "webapp_storage_admin" {
 ```
 
 ### Cloud SQL (PostgreSQL)
+
 ```hcl
 resource "google_sql_database_instance" "postgres" {
   name             = "sql-webapp-${var.environment}"
@@ -303,6 +309,7 @@ resource "google_sql_user" "webapp" {
 ## GCP CLI (gcloud) Common Operations
 
 ### Project Management
+
 ```bash
 # List projects
 gcloud projects list
@@ -320,6 +327,7 @@ gcloud services enable cloudbuild.googleapis.com
 ```
 
 ### Cloud Run
+
 ```bash
 # Deploy service
 gcloud run deploy webapp \
@@ -369,6 +377,7 @@ gcloud container images delete gcr.io/PROJECT_ID/webapp:v1.0.0 --quiet
 ```
 
 ### Cloud Build
+
 ```bash
 # Submit build
 gcloud builds submit --config cloudbuild.yaml
@@ -388,6 +397,7 @@ gcloud builds cancel BUILD_ID
 ## Cloud Build CI/CD
 
 ### Build Configuration
+
 ```yaml
 # cloudbuild.yaml
 steps:
@@ -461,6 +471,7 @@ substitutions:
 ```
 
 ### Trigger Configuration
+
 ```yaml
 # cloudbuild-trigger.yaml
 name: webapp-prod-deploy
@@ -489,6 +500,7 @@ substitutions:
 ## Service Accounts & IAM
 
 ### Service Account Creation
+
 ```hcl
 # Service account for Cloud Run
 resource "google_service_account" "webapp" {
@@ -518,6 +530,7 @@ resource "google_project_iam_member" "webapp_trace" {
 ```
 
 ### Workload Identity (GKE)
+
 ```hcl
 # Bind Kubernetes service account to GCP service account
 resource "google_service_account_iam_member" "workload_identity" {
@@ -532,6 +545,7 @@ resource "google_service_account_iam_member" "workload_identity" {
 ## Secret Manager
 
 ### Store Secrets
+
 ```hcl
 resource "google_secret_manager_secret" "db_password" {
   secret_id = "db-password-${var.environment}"
@@ -560,6 +574,7 @@ resource "google_secret_manager_secret_iam_member" "webapp_db_password" {
 ```
 
 ### Access Secrets in Code
+
 ```javascript
 // Node.js example
 const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
@@ -584,6 +599,7 @@ const dbPassword = await getSecret('db-password-prod');
 ## Cloud Functions (2nd Gen)
 
 ### Function Deployment
+
 ```hcl
 resource "google_cloudfunctions2_function" "image_processor" {
   name     = "process-images-${var.environment}"
@@ -634,6 +650,7 @@ resource "google_cloudfunctions2_function" "image_processor" {
 ```
 
 ### Function Code (index.js)
+
 ```javascript
 const functions = require('@google-cloud/functions-framework');
 const { Storage } = require('@google-cloud/storage');
@@ -656,6 +673,7 @@ functions.cloudEvent('processImage', async (cloudEvent) => {
 ## GKE (Google Kubernetes Engine)
 
 ### GKE Autopilot Cluster
+
 ```hcl
 resource "google_container_cluster" "primary" {
   name     = "gke-${var.environment}"
@@ -687,8 +705,8 @@ resource "google_container_cluster" "primary" {
   # Master authorized networks
   master_authorized_networks_config {
     cidr_blocks {
-      cidr_block   = "0.0.0.0/0"
-      display_name = "All"
+      cidr_block   = "203.0.113.0/24"
+      display_name = "approved-admin-egress"
     }
   }
 
@@ -712,6 +730,7 @@ resource "google_container_cluster" "primary" {
 ## Monitoring & Logging
 
 ### Log-based Metrics
+
 ```hcl
 resource "google_logging_metric" "error_rate" {
   name   = "error-rate-${var.environment}"
@@ -740,6 +759,7 @@ resource "google_logging_metric" "error_rate" {
 ```
 
 ### Uptime Check
+
 ```hcl
 resource "google_monitoring_uptime_check_config" "webapp" {
   display_name = "webapp-${var.environment}-uptime"
@@ -770,6 +790,7 @@ resource "google_monitoring_uptime_check_config" "webapp" {
 ```
 
 ### Alert Policy
+
 ```hcl
 resource "google_monitoring_alert_policy" "high_error_rate" {
   display_name = "High Error Rate - ${var.environment}"
@@ -804,6 +825,7 @@ resource "google_monitoring_alert_policy" "high_error_rate" {
 ## Best Practices Checklist
 
 ### Security
+
 - [ ] Use service accounts (not user accounts) for applications
 - [ ] Store secrets in Secret Manager
 - [ ] Enable VPC Service Controls for sensitive data
@@ -814,6 +836,7 @@ resource "google_monitoring_alert_policy" "high_error_rate" {
 - [ ] Regular security scanning with Security Command Center
 
 ### Cost Optimization
+
 - [ ] Use committed use discounts for predictable workloads
 - [ ] Leverage preemptible VMs for batch processing
 - [ ] Implement auto-scaling
@@ -824,6 +847,7 @@ resource "google_monitoring_alert_policy" "high_error_rate" {
 - [ ] Use labels for cost attribution
 
 ### Reliability
+
 - [ ] Deploy across multiple zones/regions
 - [ ] Implement health checks
 - [ ] Configure auto-scaling
@@ -834,6 +858,7 @@ resource "google_monitoring_alert_policy" "high_error_rate" {
 - [ ] Test failover regularly
 
 ### Operations
+
 - [ ] Use Infrastructure as Code (Terraform)
 - [ ] Implement CI/CD with Cloud Build
 - [ ] Use consistent naming conventions

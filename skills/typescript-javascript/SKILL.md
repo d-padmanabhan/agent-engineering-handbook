@@ -22,6 +22,58 @@ description: TypeScript and JavaScript development standards for modern web and 
 | **Formatting** | Prettier | Prettier |
 | **Types** | Strict mode | JSDoc types |
 
+## Non-Negotiables
+
+### NN-1: Validate at trust boundaries
+
+Static types do not validate runtime data. Treat HTTP bodies, responses, webhooks, queue messages, localStorage/sessionStorage, environment variables, CLI args, and JSON files as `unknown` until validated with Zod or an explicit type guard.
+
+Reject:
+
+- `JSON.parse(raw) as T`
+- `await response.json() as T`
+- unchecked property access on remote JSON
+- `as any` or double assertions (`value as unknown as T`)
+
+### NN-2: Fetch/API calls require timeout + status check + schema validation
+
+Every service/network `fetch` must include a timeout, check `response.ok`, and validate the JSON shape before returning typed data.
+
+```typescript
+import { z } from 'zod';
+
+async function fetchJson<T>(
+  url: string,
+  schema: z.ZodType<T>,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    signal: options.signal ?? AbortSignal.timeout(5_000),
+    headers: { Accept: 'application/json', ...options.headers },
+  });
+  if (!response.ok) {
+    throw new Error(`request failed: HTTP ${response.status}`);
+  }
+  return schema.parse(await response.json());
+}
+```
+
+### NN-3: Production servers are hardened by default
+
+Node/Express/Fastify services need bounded request bodies, explicit CORS, security headers, request IDs, structured logging, generic 5xx responses, and graceful shutdown. Do not use direct `app.listen(...)` examples for production services without retaining and closing the server.
+
+### NN-4: Package manager and runtime are pinned
+
+Declare `packageManager` and Node engine policy in `package.json`; CI uses Corepack and the declared package manager.
+
+```json
+{
+  "packageManager": "pnpm@10.0.0",
+  "engines": { "node": ">=22" }
+}
+```
+
 ## Critical Patterns
 
 ```typescript
@@ -62,7 +114,7 @@ element.innerHTML = userInput;    // ❌ BAD (XSS)
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": false
   }
 }
 ```

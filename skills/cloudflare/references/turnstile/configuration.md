@@ -169,7 +169,10 @@ import Turnstile from '@marsidev/react-turnstile';
 
 <Turnstile
   siteKey="YOUR_SITE_KEY"
-  onSuccess={(token) => console.log(token)}
+  onSuccess={(token) => {
+    // Do not log Turnstile tokens. Send to server for validation.
+    submitTurnstileToken(token);
+  }}
 />
 ```
 

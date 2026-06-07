@@ -12,12 +12,16 @@
 // CORRECT - Server validates token
 app.post('/submit', async (req, res) => {
   const token = req.body['cf-turnstile-response'];
-  const validation = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
     body: JSON.stringify({ secret: SECRET, response: token })
-  }).then(r => r.json());
+  });
+  if (!response.ok) return res.status(502).json({ error: 'CAPTCHA validation unavailable' });
+  const validation = await response.json();
 
-  if (!validation.success) return res.status(403).json({ error: 'CAPTCHA failed' });
+  if (typeof validation !== 'object' || validation === null || validation.success !== true) {
+    return res.status(403).json({ error: 'CAPTCHA failed' });
+  }
 });
 ```
 
@@ -179,7 +183,7 @@ const ip = request.headers.get('X-Forwarded-For')?.split(',')[0];
 ```javascript
 window.turnstile.render('#container', {
   sitekey: 'YOUR_SITE_KEY',
-  callback: (token) => console.log('✓ Token:', token),
+  callback: (token) => console.log('Token received:', Boolean(token)),
   'error-callback': (code) => console.error('✗ Error:', code),
   'expired-callback': () => console.warn('⏱ Expired'),
   'timeout-callback': () => console.warn('⏱ Timeout')
@@ -190,7 +194,7 @@ window.turnstile.render('#container', {
 
 ```javascript
 const token = window.turnstile.getResponse(widgetId);
-console.log('Token:', token || 'NOT READY');
+console.log('Token ready:', Boolean(token));
 console.log('Expired:', window.turnstile.isExpired(widgetId));
 ```
 

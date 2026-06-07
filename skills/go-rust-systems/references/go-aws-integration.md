@@ -7,21 +7,14 @@
 ```go
 import (
     "context"
+    "fmt"
+
+    "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/s3"
-    "github.com/aws/aws-sdk-go-v2/aws"
 )
 
-// Load default config (from env vars, credentials file, IAM role)
-cfg, err := config.LoadDefaultConfig(context.TODO())
-if err != nil {
-    return fmt.Errorf("failed to load AWS config: %w", err)
-}
-
-// Create client
-s3Client := s3.NewFromConfig(cfg)
-
-// GOOD: Client factory with retry configuration
+// GOOD: Client factory with retry configuration.
 func NewS3Client(ctx context.Context, region string) (*s3.Client, error) {
     cfg, err := config.LoadDefaultConfig(ctx,
         config.WithRegion(region),
@@ -111,16 +104,14 @@ func ListObjects(ctx context.Context, client *s3.Client, bucket string) ([]strin
 ```go
 import (
     "context"
+    "log"
+
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
-
-var dynamoClient *dynamodb.Client
-
-func init() {
-    cfg, _ := config.LoadDefaultConfig(context.TODO())
-    dynamoClient = dynamodb.NewFromConfig(cfg)
-}
 
 type Event struct {
     UserID string `json:"user_id"`
@@ -131,23 +122,30 @@ type Response struct {
     Body       string `json:"body"`
 }
 
-func handler(ctx context.Context, event Event) (Response, error) {
-    // Use global client
-    result, err := dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-        TableName: aws.String("users"),
-        Key: map[string]types.AttributeValue{
-            "id": &types.AttributeValueMemberS{Value: event.UserID},
-        },
-    })
-    if err != nil {
-        return Response{StatusCode: 500, Body: "Internal error"}, err
-    }
+func handler(client *dynamodb.Client) func(context.Context, Event) (Response, error) {
+    return func(ctx context.Context, event Event) (Response, error) {
+        result, err := client.GetItem(ctx, &dynamodb.GetItemInput{
+            TableName: aws.String("users"),
+            Key: map[string]types.AttributeValue{
+                "id": &types.AttributeValueMemberS{Value: event.UserID},
+            },
+        })
+        if err != nil {
+            return Response{StatusCode: 500, Body: "Internal error"}, err
+        }
+        _ = result // Build the real response from result.Item.
 
-    return Response{StatusCode: 200, Body: "Success"}, nil
+        return Response{StatusCode: 200, Body: "Success"}, nil
+    }
 }
 
 func main() {
-    lambda.Start(handler)
+    ctx := context.Background()
+    cfg, err := config.LoadDefaultConfig(ctx)
+    if err != nil {
+        log.Fatalf("load AWS config: %v", err)
+    }
+    lambda.Start(handler(dynamodb.NewFromConfig(cfg)))
 }
 ```
 

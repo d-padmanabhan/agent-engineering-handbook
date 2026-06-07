@@ -116,6 +116,7 @@ func TestUserService_GetUser(t *testing.T) {
 **Integration Tests:**
 
 ```go
+//go:build integration
 // +build integration
 
 package integration

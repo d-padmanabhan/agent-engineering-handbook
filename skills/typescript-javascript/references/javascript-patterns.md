@@ -14,11 +14,24 @@ Enable TypeScript checking in JavaScript files:
  * @throws {Error} If the user is not found
  */
 async function fetchUser(userId) {
-  const response = await fetch(`/api/users/${userId}`);
+  const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+    signal: AbortSignal.timeout(5_000),
+    headers: { Accept: 'application/json' },
+  });
   if (!response.ok) {
     throw new Error(`User ${userId} not found`);
   }
-  return response.json();
+  const data = await response.json();
+  if (
+    typeof data !== 'object' ||
+    data === null ||
+    typeof data.id !== 'string' ||
+    typeof data.name !== 'string' ||
+    typeof data.email !== 'string'
+  ) {
+    throw new TypeError('Invalid user response');
+  }
+  return data;
 }
 
 /**
@@ -106,11 +119,15 @@ const logger = {
 // Wrap risky operations
 async function fetchData(url) {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    return await response.json();
+    const data = await response.json();
+    if (typeof data !== 'object' || data === null) {
+      throw new TypeError('Invalid JSON response');
+    }
+    return data;
   } catch (error) {
     logger.error('Failed to fetch data', error);
     throw error;
@@ -214,8 +231,24 @@ class UserService {
   }
   
   async getUser(id) {
-    const response = await fetch(`${this.#apiUrl}/users/${id}`);
-    return response.json();
+    const response = await fetch(`${this.#apiUrl}/users/${encodeURIComponent(id)}`, {
+      signal: AbortSignal.timeout(5_000),
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`fetch user failed: HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    if (
+      typeof data !== 'object' ||
+      data === null ||
+      typeof data.id !== 'string' ||
+      typeof data.name !== 'string' ||
+      typeof data.email !== 'string'
+    ) {
+      throw new TypeError('Invalid user response');
+    }
+    return data;
   }
   
   static fromEnv() {

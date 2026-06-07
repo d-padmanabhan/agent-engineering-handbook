@@ -42,7 +42,8 @@ await step.do('call api', { retries: { limit: 3, delay: '5 seconds', backoff: 'e
   if (ctx.attempt > 1) console.log(`Retry attempt ${ctx.attempt} for step "${ctx.step.name}"`);
   const res = await fetch('https://api.example.com/data');
   if (!res.ok) throw new Error(`API failed (attempt ${ctx.attempt})`);
-  return res.json();
+  const data: unknown = await res.json();
+  return data;
 });
 
 ```
@@ -105,7 +106,8 @@ await step.do('validate', async () => {
   const res = await fetch('https://api.example.com/charge', { method: 'POST' });
   if (res.status === 401) throw new NonRetryableError('Invalid credentials'); // Don't retry
   if (!res.ok) throw new Error('Retryable failure'); // Will retry
-  return res.json();
+  const data: unknown = await res.json();
+  return data;
 });
 
 // Catching Errors

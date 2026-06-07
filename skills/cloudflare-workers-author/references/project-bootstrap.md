@@ -6,8 +6,8 @@ A copy-paste-ready setup for a new Cloudflare Worker project in TypeScript using
 
 - Wrangler v4.x (any 4.x; Wrangler 3.91+ supports `wrangler.jsonc`, but 4.x is the current major).
 - TypeScript strict mode.
-- Vitest 4.1+ with `@cloudflare/vitest-pool-workers` v0.13+ for testing (covered in `testing-with-vitest-pool.md`).
-- `wrangler types` generates `worker-configuration.d.ts` from your `wrangler.jsonc` bindings.
+- Vitest 4.1+ with `@cloudflare/vitest-pool-workers` v0.16+ for testing (covered in `testing-with-vitest-pool.md`).
+- `wrangler types` generates `worker-configuration.d.ts` (the global `Env` **and** the Workers runtime types) from your `wrangler.jsonc`. This supersedes `@cloudflare/workers-types` - do not add that package.
 
 ---
 
@@ -28,11 +28,10 @@ A copy-paste-ready setup for a new Cloudflare Worker project in TypeScript using
     "deploy:upload": "wrangler versions upload",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "wrangler types && tsc --noEmit"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.13.0",
-    "@cloudflare/workers-types": "^4.20260401.0",
+    "@cloudflare/vitest-pool-workers": "^0.16.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.0",
     "wrangler": "^4.0.0"
@@ -46,7 +45,9 @@ A copy-paste-ready setup for a new Cloudflare Worker project in TypeScript using
 Notes:
 
 - `"type": "module"` is required - Workers ESM is the only supported module format for new code.
-- `@cloudflare/workers-types` version matches your `compatibility_date` (e.g., `^4.20260401.0` pairs with `compatibility_date: "2026-04-01"`). The runtime types evolve; pin to a date.
+- **No `@cloudflare/workers-types`.** `wrangler types` generates the runtime types into `worker-configuration.d.ts`, pinned to your `compatibility_date`; current Wrangler tells you to uninstall `@cloudflare/workers-types`.
+- `typecheck` runs `wrangler types` first because `worker-configuration.d.ts` is commonly gitignored and regenerated (see the `.gitignore` note below); this keeps CI honest.
+- Vars are typed as their literal values by default. Add `--strict-vars=false` (i.e. `"types": "wrangler types --strict-vars=false"`) when a var's value varies by environment and you want `string` types.
 - Don't add `hono` if you're using native `URL` + `switch` routing for a 1-3 route Worker.
 
 ---
@@ -124,9 +125,9 @@ Notes:
     "lib": ["ESNext"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": [
-      "@cloudflare/workers-types/2026-04-01"
-    ],
+    // Runtime types come from the wrangler-generated worker-configuration.d.ts
+    // (included below), not from @cloudflare/workers-types.
+    "types": [],
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -135,7 +136,7 @@ Notes:
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
@@ -151,7 +152,7 @@ Notes:
 
 Notes:
 
-- `types: ["@cloudflare/workers-types/2026-04-01"]` - the date suffix is REQUIRED to match `compatibility_date`. Without it, you get the latest types but may miss runtime APIs gated behind a flag.
+- `types: []` - the Workers runtime types come from the generated `worker-configuration.d.ts` (included below), which is pinned to your `compatibility_date`. Don't add `@cloudflare/workers-types`; `wrangler types` supersedes it.
 - `verbatimModuleSyntax: true` enforces type-only imports (`import type { Foo } from "..."`) - catches accidental runtime imports of types.
 - `include: ["src/**/*", "worker-configuration.d.ts"]` - the generated bindings types file MUST be included so `Env` is in scope everywhere.
 
@@ -247,9 +248,9 @@ wrangler r2 bucket create production-assets
 # Queue
 wrangler queues create ingest
 
-# Secret (prompts for value; CI: pipe from a CI secret)
+# Secret (prompts for value; CI should use protected file input or secret bulk)
 wrangler secret put API_KEY
-echo "$VALUE" | wrangler secret put API_KEY   # CI pattern
+wrangler secret put API_KEY < /run/secrets/api_key
 ```
 
 After adding bindings, **always re-run `npm run types`** so the generated `Env` interface includes them.

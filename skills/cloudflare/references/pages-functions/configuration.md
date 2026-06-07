@@ -78,7 +78,7 @@ SECRET_KEY="my-secret-value"
 Accessed via `ctx.env.SECRET_KEY`. Set production secrets:
 
 ```bash
-echo "value" | npx wrangler pages secret put SECRET_KEY --project-name=my-app
+npx wrangler pages secret put SECRET_KEY --project-name=my-app < /run/secrets/secret_key
 ```
 
 ## Static Config Files

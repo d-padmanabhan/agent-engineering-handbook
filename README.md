@@ -545,3 +545,4 @@ Skills under `skills/` cover repeatable end-to-end workflows that pair with the 
 ### Workflow patterns (meta)
 
 - **[skills/skills-composition](skills/skills-composition/)** - patterns for chaining skills, scope resolution, graceful degradation
+- **[skills/skills-continuous-improvement](skills/skills-continuous-improvement/)** - biweekly maintenance workflow for rule/skill drift, stale examples, unsafe snippets, and missing non-negotiables

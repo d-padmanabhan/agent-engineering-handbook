@@ -67,6 +67,20 @@ logmsg() {
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   printf "%s: %s\n" "${timestamp}" "$*" | tee -a "${LOGFILE}" >&2
 }
+
+die() {
+  logmsg "ERROR: $*"
+  exit 1
+}
+
+debug() {
+  [[ "${DEBUG:-0}" == "1" ]] && logmsg "DEBUG: $*"
+}
+
+require_command() {
+  local command_name="$1"
+  command -v "${command_name}" >/dev/null 2>&1 || die "Missing command: ${command_name}"
+}
 ```
 
 ## Generation Contract
@@ -315,7 +329,10 @@ else
   readonly NC=''
 fi
 
-log_error "${RED}Invalid input${NC}"
+if [[ -n "${RED}" ]]; then
+  printf "%sInvalid input%s\n" "${RED}" "${NC}" >&2
+fi
+log_error "Invalid input"
 ```
 
 ### Structured Error Reporting (JSON)

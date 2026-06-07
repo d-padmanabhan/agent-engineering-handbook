@@ -509,8 +509,24 @@ Wrap a URL in backticks only when it is a **literal value**, not a navigation af
 
 ### Paths and anchors
 
-- Use relative paths for same-repo docs when practical: `[Contributing](../CONTRIBUTING.md)`
-- For file paths shown as literals (not links), backticks remain appropriate: `` `src/app.ts` ``
+- **Non-negotiable:** If a reader may want to open a file, directory, heading, ADR, rule, skill, script, workflow, or config in the repo, make it a clickable Markdown link.
+- Use relative paths for same-repo docs when practical: `[Contributing](../CONTRIBUTING.md)`, `[Python rule](../rules/200-python.mdc)`, `[Cloudflare Workers skill](../skills/cloudflare-workers-author/)`.
+- Link to headings with anchors when pointing readers to a specific section: `[Generation Contract](../rules/140-bash.mdc#generation-contract-for-non-trivial-scripts)`.
+- For GitHub source links to code, prefer line anchors when the exact implementation matters: `[guard hook](../hooks/cursor/guard_before_shell.py#L1-L40)`.
+- Do not leave navigational repo paths as plain text (`rules/200-python.mdc`) or code literals (`` `rules/200-python.mdc` ``) when the intent is navigation.
+- For file paths shown as literals (not links), backticks remain appropriate: `` `src/app.ts` ``. Use this only when the path is data, syntax, or an example value rather than a navigation target.
+
+**Preferred:**
+
+```markdown
+See [Python rule](../rules/200-python.mdc) and [Python skill](../skills/python-development/).
+```
+
+**Avoid when the reader should navigate:**
+
+```markdown
+See `rules/200-python.mdc` and `skills/python-development/`.
+```
 
 ---
 

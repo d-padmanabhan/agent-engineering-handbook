@@ -28,6 +28,8 @@ This includes (non-exhaustive):
 
 **Commits are local-only** and allowed **only after explicit user authorization** (see `130-git.mdc`).
 
+**When a push IS authorized**, sync the current branch with its remote first (`git pull origin $(git branch --show-current) --rebase`, or `git push -u origin HEAD` for a brand-new branch) before pushing - see `130-git.mdc` "Sync with remote, then push". Never `--force`/`--force-with-lease` to recover from a skipped sync unless the user explicitly authorizes it.
+
 ---
 
 ## 2) Local Branch Discipline

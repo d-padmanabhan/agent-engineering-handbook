@@ -23,7 +23,9 @@ async function getCached(env: Env, key: string): Promise<any> {
   }
 
   // L3: Origin (slow)
-  const origin = await fetch(`https://api.example.com/${key}`).then(r => r.json());
+  const response = await fetch(`https://api.example.com/${encodeURIComponent(key)}`);
+  if (!response.ok) throw new Error(`origin fetch failed: HTTP ${response.status}`);
+  const origin: unknown = await response.json();
 
   // Backfill caches
   await env.CACHE.put(key, JSON.stringify(origin), { expirationTtl: 300 }); // 5min in KV
@@ -48,7 +50,12 @@ async function getCachedData(env: Env, key: string, fetcher: () => Promise<any>)
 const apiData = await getCachedData(
   env,
   "cache:users",
-  () => fetch("https://api.example.com/users").then(r => r.json())
+  async () => {
+    const response = await fetch("https://api.example.com/users");
+    if (!response.ok) throw new Error(`fetch users failed: HTTP ${response.status}`);
+    const data: unknown = await response.json();
+    return data;
+  }
 );
 ```
 

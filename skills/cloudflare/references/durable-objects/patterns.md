@@ -90,7 +90,8 @@ async fetch(req: Request): Promise<Response> {
 async webSocketMessage(ws: WebSocket, msg: string) {
   const { userId } = ws.deserializeAttachment();  // Retrieve after wake
   const state = this.ctx.storage.kv.get("state") || {};
-  state[userId] = JSON.parse(msg);
+  const data: unknown = JSON.parse(msg);
+  state[userId] = data;
   this.ctx.storage.kv.put("state", state);
   for (const c of this.ctx.getWebSockets("room:lobby")) c.send(msg);
 }
@@ -102,8 +103,11 @@ Broadcast updates to all connected clients:
 
 ```typescript
 async webSocketMessage(ws: WebSocket, msg: string) {
-  const data = JSON.parse(msg);
-  this.ctx.storage.kv.put("doc", data.content);  // Persist
+  const data: unknown = JSON.parse(msg);
+  if (typeof data !== "object" || data === null || !("content" in data)) return;
+  const content = (data as { content: unknown }).content;
+  if (typeof content !== "string") return;
+  this.ctx.storage.kv.put("doc", content);  // Persist
   for (const c of this.ctx.getWebSockets()) if (c !== ws) c.send(msg);  // Broadcast
 }
 ```
@@ -147,7 +151,9 @@ async createSession(userId: string, data: object): Promise<string> {
 
 async getSession(id: string): Promise<object | null> {
   const row = this.ctx.storage.sql.exec("SELECT data FROM sessions WHERE id = ? AND expires_at > ?", id, Date.now()).one();
-  return row ? JSON.parse(row.data) : null;
+  if (!row) return null;
+  const data: unknown = JSON.parse(row.data as string);
+  return typeof data === "object" && data !== null ? data : null;
 }
 
 async alarm() { this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", Date.now()); }

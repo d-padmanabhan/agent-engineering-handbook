@@ -89,6 +89,7 @@ app.get('/api/v1/users', authenticate, authorize('read:users'), async (req, res)
 ## REST API Design
 
 ### Resource Naming
+
 ```
  GOOD - Plural nouns, lowercase
 GET    /api/v1/users
@@ -107,6 +108,7 @@ GET    /api/v1/Users
 ```
 
 ### HTTP Methods
+
 ```
 GET    - Retrieve resource(s) (idempotent, safe)
 POST   - Create new resource
@@ -116,6 +118,7 @@ DELETE - Remove resource (idempotent)
 ```
 
 ### Status Codes
+
 ```
 2xx Success
 200 OK                 - Successful GET, PUT, PATCH
@@ -142,6 +145,7 @@ DELETE - Remove resource (idempotent)
 ## Request/Response Patterns
 
 ### JSON Request
+
 ```json
 POST /api/v1/users
 Content-Type: application/json
@@ -154,6 +158,7 @@ Content-Type: application/json
 ```
 
 ### JSON Response (Success)
+
 ```json
 HTTP/1.1 201 Created
 Content-Type: application/json
@@ -170,6 +175,7 @@ Location: /api/v1/users/123
 ```
 
 ### Error Response (Standard Format)
+
 ```json
 HTTP/1.1 400 Bad Request
 Content-Type: application/json
@@ -194,6 +200,7 @@ Content-Type: application/json
 ## Pagination
 
 ### Offset-based
+
 ```
 GET /api/v1/users?limit=20&offset=40
 
@@ -209,6 +216,7 @@ Response:
 ```
 
 ### Cursor-based (Better for large datasets)
+
 ```
 GET /api/v1/users?limit=20&cursor=eyJpZCI6MTIzfQ==
 
@@ -227,18 +235,21 @@ Response:
 ## API Versioning
 
 ### URL Versioning (Recommended)
+
 ```
 /api/v1/users
 /api/v2/users
 ```
 
 ### Header Versioning
+
 ```
 GET /api/users
 Accept: application/vnd.acme.v1+json
 ```
 
 ### Query Parameter
+
 ```
 /api/users?version=1
 ```
@@ -248,18 +259,21 @@ Accept: application/vnd.acme.v1+json
 ## Authentication & Authorization
 
 ### Bearer Token (JWT)
+
 ```
 GET /api/v1/users
 Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 ```
 
 ### API Key
+
 ```
 GET /api/v1/users
 X-API-Key: your_api_key_here
 ```
 
 ### OAuth 2.0
+
 ```
 1. Authorization request
 2. Token exchange
@@ -271,6 +285,7 @@ X-API-Key: your_api_key_here
 ## Rate Limiting
 
 ### Headers
+
 ```
 HTTP/1.1 200 OK
 X-RateLimit-Limit: 1000
@@ -590,15 +605,22 @@ app.get('/api/v1/users/:id', async (req, res) => {
 
 ```typescript
 import pRetry from 'p-retry';
+import { z } from 'zod';
+
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
 
 async function fetchUserWithRetry(userId: string) {
   return pRetry(
     async () => {
-      const response = await fetch(`https://api.acme.com/users/${userId}`);
+      const response = await fetch(`https://api.acme.com/users/${encodeURIComponent(userId)}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      return response.json();
+      const data: unknown = await response.json();
+      return UserSchema.parse(data);
     },
     {
       retries: 3,
@@ -1575,11 +1597,13 @@ Complete REST API example demonstrating best practices:
 ```typescript
 // server.ts
 import express from 'express';
+import { createServer } from 'node:http';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '1mb' }));
 
 // Request ID middleware
 app.use((req, res, next) => {
@@ -1755,9 +1779,23 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(3000, () => {
-  console.log('API server running on http://localhost:3000');
+const server = createServer(app);
+
+server.listen(3000, () => {
+  console.log('API server running', { port: 3000 });
 });
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    server.close((error) => {
+      if (error) {
+        console.error('server shutdown failed', { error });
+        process.exit(1);
+      }
+      process.exit(0);
+    });
+  });
+}
 ```
 
 **Key Patterns Demonstrated:**

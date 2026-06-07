@@ -17,7 +17,7 @@
 
 ```dockerfile
 # ✅ GOOD - Official, minimal, secure
-FROM python:3.12-slim
+FROM python:3.14-slim
 FROM node:20-alpine
 
 # ⭐ EXCELLENT - Distroless for production
@@ -32,7 +32,7 @@ FROM ubuntu:latest
 
 ```dockerfile
 # ✅ GOOD - Explicit version pinning
-FROM python:3.12.1-slim-bookworm
+FROM python:3.14.0-slim-bookworm
 FROM node:20.10.0-alpine3.19
 
 # ❌ BAD - Unpredictable, non-reproducible
@@ -71,7 +71,7 @@ CMD ["node", "dist/index.js"]
 
 ```dockerfile
 # Build stage
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
 # Install build dependencies
@@ -84,7 +84,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Production stage
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Copy Python dependencies from builder
@@ -107,7 +107,7 @@ CMD ["python", "-m", "src.main"]
 
 ```dockerfile
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 WORKDIR /app
 
 # Copy go mod files
@@ -135,7 +135,7 @@ ENTRYPOINT ["/main"]
 
 ```dockerfile
 # ✅ GOOD - Least changing first, most changing last
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # System dependencies (rarely change)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -150,7 +150,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 
 # ❌ BAD - Application code copied before dependencies
-FROM python:3.12-slim
+FROM python:3.14-slim
 COPY . .  # Invalidates cache on every code change
 RUN pip install -r requirements.txt
 ```
@@ -210,7 +210,7 @@ RUN rm -rf /var/lib/apt/lists/*
 **Python:**
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Create non-root user
@@ -248,7 +248,7 @@ CMD ["node", "index.js"]
 
 ```dockerfile
 # Python distroless
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
@@ -295,7 +295,7 @@ cosign verify --key cosign.pub acme.com/myapp:v1.0.0
 **Python FastAPI:**
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 COPY requirements.txt .
@@ -338,7 +338,7 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Using curl
-FROM python:3.12-slim
+FROM python:3.14-slim
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 ```
@@ -365,7 +365,7 @@ docker build --secret id=npmtoken,src=$HOME/.npmrc -t myapp:latest .
 **Python:**
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 COPY requirements.txt .
@@ -397,7 +397,7 @@ CMD ["node", "index.js"]
 **Go:**
 
 ```dockerfile
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -622,7 +622,7 @@ http {
 
 ```dockerfile
 # AWS Lambda container compatible
-FROM public.ecr.aws/lambda/python:3.12
+FROM public.ecr.aws/lambda/python:3.14
 
 # Copy requirements and install
 COPY requirements.txt ${LAMBDA_TASK_ROOT}/

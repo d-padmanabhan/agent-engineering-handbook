@@ -101,11 +101,24 @@ go tool pprof mem.prof
 **HTTP Profiling:**
 
 ```go
-import _ "net/http/pprof"
+import (
+    "log"
+    "net/http"
+    _ "net/http/pprof"
+    "time"
+)
 
 func main() {
     go func() {
-        log.Println(http.ListenAndServe("localhost:6060", nil))
+        srv := &http.Server{
+            Addr:              "localhost:6060",
+            Handler:           http.DefaultServeMux,
+            ReadHeaderTimeout: 5 * time.Second,
+            ReadTimeout:       15 * time.Second,
+            WriteTimeout:      30 * time.Second,
+            IdleTimeout:       60 * time.Second,
+        }
+        log.Println(srv.ListenAndServe())
     }()
     // Application code...
 }

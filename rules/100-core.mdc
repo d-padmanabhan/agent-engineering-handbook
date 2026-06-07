@@ -636,12 +636,12 @@ To refine the solution, clarify:
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LOG_FILE="${SCRIPT_DIR}/script.log"
+readonly LOGFILE="${SCRIPT_DIR}/script.log"
 
 log() {
-    local level="$1"
-    shift
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${level}] $*" | tee -a "${LOG_FILE}"
+  local level="$1"
+  shift
+  printf "%s [%s] %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "${level}" "$*" | tee -a "${LOGFILE}" >&2
 }
 
 main() {
@@ -780,7 +780,7 @@ func processFile(filename string) error {
 **Docker:**
 - Use multi-stage builds to reduce image size.
 - Run as non-root user (avoid `USER root`).
-- Pin base image versions (`python:3.12.1-slim`, not `python:latest`).
+- Pin base image versions (`python:3.14.0-slim`, not `python:latest`).
 - Use `.dockerignore` to exclude unnecessary files.
 - Scan images for vulnerabilities via centralized scanning gates (JFrog Xray / AWS ECR enhanced scanning).
 - Minimize layers (combine `RUN` commands with `&&`).

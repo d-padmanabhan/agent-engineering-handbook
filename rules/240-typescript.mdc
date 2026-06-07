@@ -129,7 +129,7 @@ if (isUser(data)) {
     "rootDir": "./src",
 
     /* Advanced */
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "resolveJsonModule": true,
 
     /* Path Mapping */
@@ -155,7 +155,7 @@ if (isUser(data)) {
     "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
@@ -166,6 +166,104 @@ if (isUser(data)) {
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
+}
+```
+
+## Non-Negotiables
+
+### NN-1: Runtime validation at trust boundaries
+
+TypeScript types do not validate runtime data. Any value crossing a trust boundary (HTTP request/response, queue message, webhook, localStorage/sessionStorage, environment variable, CLI arg, database row, or JSON file) MUST be parsed as `unknown` and validated with a schema or explicit type guard before use.
+
+Reject in review:
+
+- `const user = data as User` at a trust boundary
+- `JSON.parse(raw) as SomeType`
+- `await response.json() as SomeType`
+- accessing fields on unvalidated remote JSON
+
+```typescript
+import { z } from 'zod';
+
+const UserSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+});
+
+type User = z.infer<typeof UserSchema>;
+
+function parseUser(value: unknown): User {
+  return UserSchema.parse(value);
+}
+```
+
+### NN-2: Fetch/API calls require timeout, status check, and schema validation
+
+Every network call must set a timeout, check `response.ok`, and validate response JSON before returning typed data.
+
+```typescript
+import { z } from 'zod';
+
+async function fetchJson<T>(
+  url: string,
+  schema: z.ZodType<T>,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    signal: options.signal ?? AbortSignal.timeout(5_000),
+    headers: {
+      Accept: 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`request failed: HTTP ${response.status}`);
+  }
+
+  return schema.parse(await response.json());
+}
+```
+
+Reject in review:
+
+- `const data: ApiResponse<T> = await response.json()`
+- `fetch(url)` with no timeout in service code
+- retrying non-idempotent writes without idempotency keys
+
+### NN-3: Type assertions are not validation
+
+Use `as` only after a narrowing step, with DOM APIs where TypeScript cannot infer a specific subtype, or at tightly contained interop boundaries. Prefer `satisfies`, schema parsing, assertion functions, or discriminated unions.
+
+Reject in review:
+
+- double assertions (`value as unknown as T`)
+- branded type constructors that cast without validating the string
+- `as any`
+- `!` non-null assertions where an explicit guard would be simple
+
+### NN-4: Production servers are hardened by default
+
+Node/Express/Fastify services must use bounded request bodies, explicit CORS, security headers, request IDs, structured logging, generic 5xx client responses, and graceful shutdown.
+
+Reject in review:
+
+- `app.listen(...)` directly in production examples without retaining the returned server and handling shutdown
+- `express.json()` with no `limit`
+- wildcard CORS on credentialed/private APIs
+- raw internal errors returned to clients
+
+### NN-5: Package manager and runtime are pinned
+
+Every package must declare `packageManager` and Node engine policy in `package.json`. CI must use Corepack and the declared package manager.
+
+```json
+{
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22"
+  }
 }
 ```
 
@@ -672,40 +770,49 @@ const [name, setName] = useLocalStorage<string>('name', 'John');
 
 ### Type-Safe Fetch Wrapper
 ```typescript
-// API response types
-type ApiResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: { message: string; code: number } };
+import { z } from 'zod';
 
-// Type-safe fetch function
-async function fetchApi<T>(
+const ApiErrorSchema = z.object({
+  success: z.literal(false),
+  error: z.object({ message: z.string(), code: z.number() }),
+});
+
+function apiResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
+  return z.discriminatedUnion('success', [
+    z.object({ success: z.literal(true), data: dataSchema }),
+    ApiErrorSchema,
+  ]);
+}
+
+async function fetchApi<T extends z.ZodTypeAny>(
   url: string,
-  options?: RequestInit
-): Promise<T> {
-  try {
-    const response = await fetch(url, options);
+  schema: T,
+  options: RequestInit = {},
+): Promise<z.infer<T>> {
+  const response = await fetch(url, {
+    ...options,
+    signal: options.signal ?? AbortSignal.timeout(5_000),
+    headers: {
+      Accept: 'application/json',
+      ...options.headers,
+    },
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data: ApiResponse<T> = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.error.message);
-    }
-
-    return data.data;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Unknown error occurred');
+  if (!response.ok) {
+    throw new Error(`request failed: HTTP ${response.status}`);
   }
+
+  const parsed = apiResponseSchema(schema).parse(await response.json());
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.message);
+  }
+
+  return parsed.data;
 }
 
 // Usage with automatic type inference
-const user = await fetchApi<User>('/api/users/123');
+const user = await fetchApi('/api/users/123', UserSchema);
 console.log(user.name); //  Type-safe
 ```
 
@@ -1355,20 +1462,37 @@ export function createUserRouter(service: UserService) {
 
 // app.ts
 import express from 'express';
+import { createServer } from 'node:http';
 import { UserService } from './service';
 import { InMemoryUserRepository } from './repository';
 import { createUserRouter } from './api';
 
 const app = express();
-app.use(express.json());
+app.disable('x-powered-by');
+// Add helmet(), explicit cors({ origin: [...] }), rate limiting, and request IDs in production.
+app.use(express.json({ limit: '1mb' }));
 
 const repository = new InMemoryUserRepository();
 const service = new UserService(repository);
 app.use(createUserRouter(service));
 
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
+const server = createServer(app);
+
+server.listen(3000, () => {
+  console.log('server listening', { port: 3000 });
 });
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    server.close((error) => {
+      if (error) {
+        console.error('server shutdown failed', { error });
+        process.exit(1);
+      }
+      process.exit(0);
+    });
+  });
+}
 ```
 
 **Key Patterns Demonstrated:**

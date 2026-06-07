@@ -150,7 +150,7 @@ Check with:
 
 ```bash
 echo "CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-(not set)}"
-echo "CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-(not set)}"
+test -n "${CLOUDFLARE_API_TOKEN:-}" && echo "CLOUDFLARE_API_TOKEN=(set)" || echo "CLOUDFLARE_API_TOKEN=(not set)"
 echo "FLAGSHIP_APP_ID=${FLAGSHIP_APP_ID:-(not set)}"
 ```
 

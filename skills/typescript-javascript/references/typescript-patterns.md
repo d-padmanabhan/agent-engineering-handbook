@@ -26,7 +26,7 @@
     "declaration": true,
     "sourceMap": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     
     "outDir": "./dist",
     "rootDir": "./src",
@@ -92,7 +92,7 @@ type StatusRecord = Record<Status, string>;
 
 ```typescript
 // Extract return type
-type ReturnOf<T> = T extends (...args: any[]) => infer R ? R : never;
+type ReturnOf<T> = T extends (...args: never[]) => infer R ? R : never;
 
 // Exclude null and undefined
 type NonNullable<T> = T extends null | undefined ? never : T;
@@ -148,7 +148,17 @@ type UserId = string & { readonly brand: unique symbol };
 type OrderId = string & { readonly brand: unique symbol };
 
 function createUserId(id: string): UserId {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(id)) {
+    throw new Error('Invalid user ID format');
+  }
   return id as UserId;
+}
+
+function createOrderId(id: string): OrderId {
+  if (!/^order-[a-z0-9-]+$/.test(id)) {
+    throw new Error('Invalid order ID format');
+  }
+  return id as OrderId;
 }
 
 function getUser(id: UserId): User {
@@ -156,7 +166,7 @@ function getUser(id: UserId): User {
 }
 
 const userId = createUserId('123');
-const orderId = 'order-456' as OrderId;
+const orderId = createOrderId('order-456');
 
 getUser(userId);   // ✅ OK
 getUser(orderId);  // ❌ Type error
@@ -169,7 +179,7 @@ type Result<T, E = Error> =
   | { ok: true; value: T }
   | { ok: false; error: E };
 
-function parseJson<T>(json: string): Result<T> {
+function parseJson(json: string): Result<unknown> {
   try {
     return { ok: true, value: JSON.parse(json) };
   } catch (e) {
@@ -178,11 +188,11 @@ function parseJson<T>(json: string): Result<T> {
 }
 
 // Usage
-const result = parseJson<User>(jsonString);
-if (result.ok) {
+const result = parseJson(jsonString);
+if (result.ok && isUser(result.value)) {
   console.log(result.value.name);
 } else {
-  console.error(result.error.message);
+  console.error(result.ok ? 'Invalid user payload' : result.error.message);
 }
 ```
 

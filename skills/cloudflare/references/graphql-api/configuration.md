@@ -50,9 +50,13 @@ async function queryGraphQL<T>(query: string, variables: Record<string, unknown>
     body: JSON.stringify({ query, variables }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  const json = await response.json() as { data: T | null; errors?: { message: string }[] };
-  if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
-  return json.data!;
+  const json: unknown = await response.json();
+  if (typeof json !== "object" || json === null || !("data" in json)) {
+    throw new Error("Invalid GraphQL response shape");
+  }
+  const result = json as { data: T | null; errors?: { message: string }[] };
+  if (result.errors?.length) throw new Error(result.errors.map((e) => e.message).join("; "));
+  return result.data!;
 }
 ```
 

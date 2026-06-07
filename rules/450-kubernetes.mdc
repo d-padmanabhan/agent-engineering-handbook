@@ -160,35 +160,35 @@ CRDs must be **well documented** with rich comments that become field descriptio
 // It manages the lifecycle of execution workloads and provides isolation
 // between different execution contexts.
 type ExecutionEngine struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+ metav1.TypeMeta   `json:",inline"`
+ metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ExecutionEngineSpec   `json:"spec,omitempty"`
-	Status ExecutionEngineStatus `json:"status,omitempty"`
+ Spec   ExecutionEngineSpec   `json:"spec,omitempty"`
+ Status ExecutionEngineStatus `json:"status,omitempty"`
 }
 
 type ExecutionEngineSpec struct {
-	// +kubebuilder:validation:Required
-	// Address configuration for the execution service endpoint.
-	// This must be a valid network address reachable from the cluster.
-	Address AddressSpec `json:"address"`
+ // +kubebuilder:validation:Required
+ // Address configuration for the execution service endpoint.
+ // This must be a valid network address reachable from the cluster.
+ Address AddressSpec `json:"address"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=30
-	// Timeout in seconds for data workload execution.
-	// Workloads exceeding this timeout will be terminated.
-	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+ // +kubebuilder:validation:Optional
+ // +kubebuilder:default=30
+ // Timeout in seconds for data workload execution.
+ // Workloads exceeding this timeout will be terminated.
+ TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1
-	// Number of replicas for the execution engine.
-	// Scale this based on expected workload volume.
-	Replicas *int32 `json:"replicas,omitempty"`
+ // +kubebuilder:validation:Optional
+ // +kubebuilder:default=1
+ // Number of replicas for the execution engine.
+ // Scale this based on expected workload volume.
+ Replicas *int32 `json:"replicas,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// Resource limits for execution engine pods.
-	// If not specified, default limits will be applied.
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+ // +kubebuilder:validation:Optional
+ // Resource limits for execution engine pods.
+ // If not specified, default limits will be applied.
+ Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 ```
 
@@ -203,6 +203,7 @@ Additional printer columns show essential data in `kubectl get` output:
 ```
 
 **Output:**
+
 ```bash
 $ kubectl get executionengines
 NAME              STATUS   REPLICAS   AGE
@@ -217,6 +218,7 @@ flink-engine      Pending  1          2m
 **CRITICAL:** When encountering optimistic concurrency conflicts ("object has been modified" errors), **avoid retry logic** as it masks genuine concurrency issues.
 
 **Instead:**
+
 1. Identify why multiple controllers are updating the same resource
 2. Fix the root cause
 3. Ensure single ownership patterns
@@ -224,35 +226,35 @@ flink-engine      Pending  1          2m
 ```go
 //  BAD: Retrying on conflict masks the real problem
 func (r *Reconciler) updateStatus(ctx context.Context, obj *MyResource) error {
-	for i := 0; i < 5; i++ {
-		err := r.Client.Status().Update(ctx, obj)
-		if err == nil {
-			return nil
-		}
-		if !apierrors.IsConflict(err) {
-			return err
-		}
-		// Retry on conflict - THIS IS WRONG
-		time.Sleep(time.Second)
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
-			return err
-		}
-	}
-	return fmt.Errorf("failed after retries")
+ for i := 0; i < 5; i++ {
+  err := r.Client.Status().Update(ctx, obj)
+  if err == nil {
+   return nil
+  }
+  if !apierrors.IsConflict(err) {
+   return err
+  }
+  // Retry on conflict - THIS IS WRONG
+  time.Sleep(time.Second)
+  if err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
+   return err
+  }
+ }
+ return fmt.Errorf("failed after retries")
 }
 
 //  GOOD: Single ownership, no retries
 func (r *Reconciler) updateStatus(ctx context.Context, obj *MyResource) error {
-	// Only this controller updates status - no conflicts expected
-	if err := r.Client.Status().Update(ctx, obj); err != nil {
-		if apierrors.IsConflict(err) {
-			// Conflict indicates architectural problem - log and investigate
-			r.Log.Error(err, "Unexpected conflict updating status - check for multiple controllers")
-			return fmt.Errorf("status update conflict: %w", err)
-		}
-		return err
-	}
-	return nil
+ // Only this controller updates status - no conflicts expected
+ if err := r.Client.Status().Update(ctx, obj); err != nil {
+  if apierrors.IsConflict(err) {
+   // Conflict indicates architectural problem - log and investigate
+   r.Log.Error(err, "Unexpected conflict updating status - check for multiple controllers")
+   return fmt.Errorf("status update conflict: %w", err)
+  }
+  return err
+ }
+ return nil
 }
 ```
 
@@ -264,23 +266,23 @@ func (r *Reconciler) updateStatus(ctx context.Context, obj *MyResource) error {
 //  GOOD: Clear ownership
 // This controller owns status.phase
 func (r *PhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	obj := &MyResource{}
-	if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
+ obj := &MyResource{}
+ if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
+  return ctrl.Result{}, client.IgnoreNotFound(err)
+ }
 
-	// Calculate new phase
-	newPhase := r.calculatePhase(obj)
+ // Calculate new phase
+ newPhase := r.calculatePhase(obj)
 
-	// Update only if changed
-	if obj.Status.Phase != newPhase {
-		obj.Status.Phase = newPhase
-		if err := r.Status().Update(ctx, obj); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
+ // Update only if changed
+ if obj.Status.Phase != newPhase {
+  obj.Status.Phase = newPhase
+  if err := r.Status().Update(ctx, obj); err != nil {
+   return ctrl.Result{}, err
+  }
+ }
 
-	return ctrl.Result{}, nil
+ return ctrl.Result{}, nil
 }
 ```
 
@@ -291,18 +293,18 @@ Check for race conditions:
 ```go
 //  GOOD: Check current state before updating
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	obj := &MyResource{}
-	if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
+ obj := &MyResource{}
+ if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
+  return ctrl.Result{}, client.IgnoreNotFound(err)
+ }
 
-	// Check if already in desired state
-	if obj.Status.Phase == "Ready" && obj.Spec.DesiredReplicas == *obj.Status.Replicas {
-		return ctrl.Result{}, nil  // No work needed
-	}
+ // Check if already in desired state
+ if obj.Status.Phase == "Ready" && obj.Spec.DesiredReplicas == *obj.Status.Replicas {
+  return ctrl.Result{}, nil  // No work needed
+ }
 
-	// Perform reconciliation
-	// ...
+ // Perform reconciliation
+ // ...
 }
 ```
 
@@ -601,14 +603,14 @@ spec:
 ```go
 // Monitor for frequent conflicts
 func (r *Reconciler) recordConflict(ctx context.Context, obj client.Object) {
-	r.Recorder.Eventf(
-		obj,
-		corev1.EventTypeWarning,
-		"UpdateConflict",
-		"Conflict updating resource - investigate multiple controllers",
-	)
-	// Also log metrics
-	conflictCounter.Inc()
+ r.Recorder.Eventf(
+  obj,
+  corev1.EventTypeWarning,
+  "UpdateConflict",
+  "Conflict updating resource - investigate multiple controllers",
+ )
+ // Also log metrics
+ conflictCounter.Inc()
 }
 ```
 
@@ -643,7 +645,7 @@ resource "aws_eks_cluster" "main" {
     subnet_ids              = aws_subnet.private[*].id
     endpoint_private_access = true
     endpoint_public_access  = true
-    public_access_cidrs     = ["0.0.0.0/0"]  # Restrict in production
+    public_access_cidrs     = ["203.0.113.0/24"]  # Replace with approved admin/VPN egress CIDRs
   }
 
   enabled_cluster_log_types = [
@@ -1151,26 +1153,26 @@ func (r *MyResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 ### Do's
 
--  Document CRDs with kubebuilder tags and comments
--  Use printer columns for `kubectl get` output
--  Ensure single ownership for status updates
--  Use IRSA for AWS service access
--  Set resource requests and limits
--  Use Network Policies for security
--  Monitor for concurrency conflicts
--  Use Pod Disruption Budgets
--  Use finalizers for cleanup
--  Record events for observability
+- Document CRDs with kubebuilder tags and comments
+- Use printer columns for `kubectl get` output
+- Ensure single ownership for status updates
+- Use IRSA for AWS service access
+- Set resource requests and limits
+- Use Network Policies for security
+- Monitor for concurrency conflicts
+- Use Pod Disruption Budgets
+- Use finalizers for cleanup
+- Record events for observability
 
 ### Don'ts
 
--  Retry on concurrency conflicts
--  Allow multiple controllers to update same resource
--  Skip CRD documentation
--  Hardcode AWS credentials
--  Skip resource limits
--  Ignore conflict errors
--  Use imperative APIs when declarative is possible
+- Retry on concurrency conflicts
+- Allow multiple controllers to update same resource
+- Skip CRD documentation
+- Hardcode AWS credentials
+- Skip resource limits
+- Ignore conflict errors
+- Use imperative APIs when declarative is possible
 
 ## Review Checklist
 
@@ -1188,4 +1190,5 @@ When reviewing Kubernetes code, check:
 - [ ] Observability configured (metrics, logs)
 - [ ] Finalizers used for cleanup
 - [ ] Events recorded for debugging
+
 ---

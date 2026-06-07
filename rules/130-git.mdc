@@ -622,9 +622,12 @@ git pull origin main && git checkout -b feat/your-feature
 - No `--ff-only` protection (could create merge commit)
 - Uses `checkout` (works on older Git but less clear than `switch`)
 
-## Sync with remote, then push (branch-agnostic)
+## Sync with remote, then push (REQUIRED before every push)
 
-When pushing after a local commit, sync with the remote first so the push is not rejected. Use **pull with rebase** so your commits are replayed on top of the remote branch (no merge commit). Use the **current branch** explicitly so the same commands work on `main` or any feature branch.
+> [!IMPORTANT]
+> **Always sync the current branch with its remote immediately before pushing to an existing remote branch.** Pushing stale history causes non-fast-forward rejections and tempts a `--force` that can clobber teammates' commits. Syncing first keeps the push clean and history linear. (This does not authorize the push itself - for agents, remote writes remain default-deny per `020-agent-audit.mdc` and require explicit user approval.)
+
+Sync the **current branch** with its remote using **pull with rebase** (replays your local commits on top of the remote, no merge commit), then push. Using the current branch explicitly means the same commands work on `main` or any feature branch.
 
 **Two-step (recommended for clarity):**
 
@@ -644,8 +647,14 @@ git pull origin $(git branch --show-current) --rebase; git push origin $(git bra
 | `$(git branch --show-current)` | Current branch name (e.g. `main`, `feat/foo`); avoids hardcoding. |
 | `--rebase` | Replay your local commits on top of remote; avoids merge commits and keeps history linear. |
 
+**Only exception - a brand-new branch with no upstream yet:** there is nothing to pull, so publish it directly and set the upstream in one step:
+
+```bash
+git push -u origin HEAD
+```
+
 > [!NOTE]
-> In PowerShell, `$(git branch --show-current)` works. In POSIX shells, backticks `` `git branch --show-current` `` are equivalent. Agents and scripts that run "sync then push" after an approved commit should use this pattern so it works on any branch.
+> In PowerShell, `$(git branch --show-current)` works. In POSIX shells, backticks `` `git branch --show-current` `` are equivalent. Agents and scripts that run "sync then push" after an approved commit MUST use this pattern (or the new-branch exception above) so it works on any branch.
 
 ---
 
@@ -911,7 +920,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1

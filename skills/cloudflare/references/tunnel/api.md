@@ -166,7 +166,7 @@ cloudflared service install <TOKEN>
 cloudflared tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
 
 # Docker
-docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+docker run cloudflare/cloudflared:2025.6.0 tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
 ```
 
 ### Get Tunnel Token (TypeScript)

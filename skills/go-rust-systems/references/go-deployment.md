@@ -71,7 +71,7 @@ exclude_dir = ["tmp", "vendor", ".git"]
 
 ```dockerfile
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 
 WORKDIR /build
 
@@ -85,24 +85,16 @@ COPY . .
 # Build binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o myapp ./cmd/myapp
 
-# Runtime stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
+# Runtime stage - distroless + nonroot
+FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
-
-# Copy binary from builder
-COPY --from=builder /build/myapp .
-
-# Run as non-root user
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
-USER appuser
+COPY --from=builder /build/myapp /app/myapp
+USER nonroot:nonroot
 
 EXPOSE 8080
 
-CMD ["./myapp"]
+CMD ["/app/myapp"]
 ```
 
 ## CI/CD with GitHub Actions

@@ -138,7 +138,7 @@ When asking questions (limit to ≤3), prioritize those that would most change t
 
 - Use multi-stage builds to reduce image size
 - Run as non-root user
-- Pin base image versions (`python:3.12.1-slim`, not `python:latest`)
+- Pin base image versions (`python:3.14.0-slim`, not `python:latest`)
 - Scan images for vulnerabilities
 
 ### AWS (boto3/Lambda)

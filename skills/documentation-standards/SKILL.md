@@ -22,6 +22,7 @@ description: >-
 
 - **No AI slop** - remove filler, keep docs concrete and task-oriented
 - **No em dashes/en dashes** - use hyphens (`-`) instead
+- **Clickable navigation** - if readers may want to open a repo file, directory, section, ADR, rule, skill, script, workflow, or config, make it a Markdown link. Use backticks only when the path is a literal value, not a navigation target.
 
 ## Voice
 
@@ -108,9 +109,17 @@ def hello():
 ```markdown
 [Link text](https://acme.com)
 [Reference link][1]
+[Python rule](../rules/200-python.mdc)
+[Generation Contract](../rules/140-bash.mdc#generation-contract-for-non-trivial-scripts)
 
 [1]: https://acme.com
 ```
+
+Prefer clickable same-repo references:
+
+- Good: `[Python skill](../skills/python-development/)`
+- Avoid for navigation: `` `skills/python-development/` ``
+- Good for literals: `` `src/app.ts` `` when discussing a path value or config example
 
 ### Tables
 ```markdown

@@ -199,6 +199,7 @@ wrangler publish                                  # Deploy
 ```
 
 ### Critical Patterns
+
 ```javascript
 //  GOOD: Fast to slow evaluation order
 (
@@ -221,6 +222,7 @@ http.host eq "api.acme.com" or http.host eq "admin.acme.com"
 ```
 
 ### Field Performance Tiers
+
 ```
 Fast: ip.src, http.host, http.request.method
 Medium: http.request.uri.path, headers, cf.threat_score
@@ -248,7 +250,7 @@ Example (raw regex + anchors):
 
 ---
 
-##  Meta-Prompt (How to Use This Guide)
+## Meta-Prompt (How to Use This Guide)
 
 ```
 You are an expert Cloudflare engineer. Use this guide to help me create, optimize, test, and deploy Cloudflare rules for my requirement: **[Insert requirement]**
@@ -270,10 +272,12 @@ For each phase, show your work and provide a final production-ready rule with de
 
 ---
 
-##  Phase 1: Discovery & Planning
+## Phase 1: Discovery & Planning
 
 ### 1) Requirements Analysis (Prompt)
+>
 > Analyze the requirement and identify:
+>
 > 1. Primary security/business objective
 > 2. Edge cases / exceptions
 > 3. Traffic volume / performance constraints
@@ -281,7 +285,9 @@ For each phase, show your work and provide a final production-ready rule with de
 > 5. Compliance/audit needs
 
 ### 2) Rule Type Selection (Prompt)
+>
 > Recommend the optimal product/rule type (with trade-offs):
+>
 > - **WAF Custom Rules** (`http_request_firewall_custom`)
 > - **Rate Limiting Rules** (`http_ratelimit`)
 > - **Transform Rules** (URI/path/header edits, redirects)
@@ -290,9 +296,10 @@ For each phase, show your work and provide a final production-ready rule with de
 
 ---
 
-##  Phase 2: Rule Generation
+## Phase 2: Rule Generation
 
 ### 3) Generate from Policy (Prompt + Pattern)
+>
 > Create a Cloudflare expression for: **[Policy]**
 > Use `in` sets, clear grouping, and comments.
 
@@ -301,17 +308,20 @@ For each phase, show your work and provide a final production-ready rule with de
 (
   http.host in {"admin.acme.com" "manage.acme.com"} and
   starts_with(http.request.uri.path, "/admin/") and
-  not (ip.src in {10.0.0.0/8 192.168.0.0/16} or cf.tls_client_auth.cert_verified)
+  not (ip.src in $trusted_admin_egress_ips or cf.tls_client_auth.cert_verified)
 )
 ```
 
 ### 4) Smart Regex (Prompt)
+>
 > Generate an optimized regex for **[field]**; prefer non-regex when possible. Include test cases.
 
 ### 5) Geo + AS Nuance (Prompt)
+>
 > Build a geo/ASN rule that blocks high-risk regions and known hostile ASNs, with bypasses for verified bots/VPN scenarios.
 
 ### 6) API Protection (Prompt + Pattern)
+
 ```javascript
 # API hardening for /api/v2/*
 (
@@ -331,9 +341,11 @@ For each phase, show your work and provide a final production-ready rule with de
 ## Phase 3: Optimization
 
 ### 7) Performance Ordering (Prompt)
+>
 > Reorder cheap checks first (IP, host, method), then path/header, and use regex last. Short-circuit for early exits.
 
 **Example:**
+
 ```javascript
 //  BAD: Expensive first
 (http.request.body.raw contains "x" and http.host eq "acme.com")
@@ -343,9 +355,11 @@ For each phase, show your work and provide a final production-ready rule with de
 ```
 
 ### 8) Readability Pass (Prompt)
+>
 > Add comments, group parenthesis, and standard indentation.
 
 ### 9) Consolidate Redundancy (Prompt)
+>
 > Merge rules with common predicates; keep separate if operational clarity/ownership needs require it.
 
 ## Advanced Patterns
@@ -535,7 +549,12 @@ export default {
     const cached = await env.IP_REPUTATION_KV.get(ip);
     if (cached) {
       const data = JSON.parse(cached);
-      if (data.threat_score > 30) {
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        typeof data.threat_score === 'number' &&
+        data.threat_score > 30
+      ) {
         return new Response('Blocked', { status: 403 });
       }
     }
@@ -556,6 +575,7 @@ export default {
 ### Workers vs Rules Decision Matrix
 
 **Use Rules when:**
+
 - Simple request filtering
 - Rate limiting
 - Header/path manipulation
@@ -563,6 +583,7 @@ export default {
 - Bot score gating
 
 **Use Workers when:**
+
 - Response body inspection
 - External API calls
 - Stateful logic (KV/Durable Objects)
@@ -661,6 +682,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
 **Diagnosis Steps:**
 
 1. **Check rule order:**
+
    ```bash
    # List rules in order
    curl -X GET \
@@ -669,6 +691,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
    ```
 
 2. **Verify rule is enabled:**
+
    ```bash
    # Check specific rule
    curl -X GET \
@@ -677,6 +700,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
    ```
 
 3. **Test with simpler expression:**
+
    ```javascript
    // Start simple
    (http.host eq "api.acme.com")
@@ -686,6 +710,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
    ```
 
 4. **Check field names (case-sensitive):**
+
    ```javascript
    // BAD: Wrong case
    http.request.uri.Path contains "/admin"
@@ -699,6 +724,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
 **Common Causes & Fixes:**
 
 1. **Missing bypass for verified bots:**
+
    ```javascript
    // BAD: Blocks legitimate bots
    (http.request.uri.path contains "/api/" and rate(ip.src, 1m) > 100)
@@ -712,6 +738,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
    ```
 
 2. **Case-sensitive matching:**
+
    ```javascript
    // BAD: Case sensitive
    http.request.uri.path contains "/Admin"
@@ -721,6 +748,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
    ```
 
 3. **Missing IP allowlist:**
+
    ```javascript
    // Add allowlist for known good IPs
    (
@@ -752,12 +780,14 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
 **Common Problems:**
 
 1. **State lock:**
+
    ```bash
    # Force unlock (use with caution)
    terraform force-unlock <LOCK_ID>
    ```
 
 2. **State drift:**
+
    ```bash
    # Refresh state
    terraform refresh
@@ -767,6 +797,7 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
    ```
 
 3. **State conflicts:**
+
    ```bash
    # Use remote state backend
    terraform {
@@ -780,9 +811,10 @@ curl -H "X-Forwarded-For: 1.1.1.1\r\nX-Admin: true" https://api.acme.com/
 
 ---
 
-##  Phase 4: Security Hardening
+## Phase 4: Security Hardening
 
 ### 10) Bypass Analysis (Prompt + Hardened Pattern)
+
 ```javascript
 //  VULNERABLE: Case sensitive, single encoding
 http.request.uri.path contains "/admin"
@@ -796,9 +828,11 @@ http.request.uri.path contains "/admin"
 ```
 
 ### 11) Rate Limiting Strategy (Prompt)
+>
 > Define per-IP, per-key/JWT, and endpoint-tier limits; specify increment conditions and bypasses.
 
 **Tiered Rate Limiting:**
+
 ```javascript
 # Tier 1: Per-IP (basic protection)
 (http.request.uri.path contains "/api/" and rate(ip.src, 1m) > 100)
@@ -812,19 +846,23 @@ http.request.uri.path contains "/admin"
 ```
 
 ### 12) Bot Management (Prompt)
+>
 > Gate by `cf.bot_management.score`, allow verified bots, challenge suspicious automation.
 
 ### 13) DLP Helpers (Prompt)
+>
 > Request-side rules to prevent leaking tokens/PANs in query/paths; note response scanning needs DLP features or Workers.
 
 ---
 
-##  Phase 5: Testing & Validation
+## Phase 5: Testing & Validation
 
 ### 14) Test Case Generator (Prompt)
+>
 > Produce **positive/negative/edge/security/perf** cases (curl or API format) for the rule.
 
 **Example Tests:**
+
 ```bash
 # Should block
 curl -H "Host: admin.acme.com" https://edge.acme.com/dashboard
@@ -840,9 +878,11 @@ curl https://edge.acme.com/%2561dmin
 ```
 
 ### 15) Logic Validator (Prompt)
+>
 > Double-check operator precedence (**AND** before **OR**), null header handling, and field existence.
 
 **Common Logic Errors:**
+
 ```javascript
 //  BAD: Precedence issue
 A or B and C  // Interpreted as: A or (B and C)
@@ -859,6 +899,7 @@ http.request.headers["x-api-key"][0] eq "secret"
 ```
 
 ### 16) Monitoring Queries (Prompt + Pattern)
+
 ```graphql
 # Monitor rule effectiveness
 {
@@ -880,11 +921,12 @@ http.request.headers["x-api-key"][0] eq "secret"
 
 ---
 
-##  Phase 6: Deployment & Ops
+## Phase 6: Deployment & Ops
 
 ### 17) IaC / API Conversion (Prompt + Terraform & API)
 
 **Terraform:**
+
 ```hcl
 resource "cloudflare_ruleset" "waf_custom" {
   zone_id = var.zone_id
@@ -915,6 +957,7 @@ resource "cloudflare_ruleset" "waf_custom" {
 ```
 
 **API:**
+
 ```bash
 curl -X POST \
   "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/rulesets" \
@@ -923,9 +966,11 @@ curl -X POST \
 ```
 
 ### 18) Staged Rollout (Prompt)
+>
 > Log-only -> Managed Challenge -> Block; narrow by path/geo; define rollback triggers & SLOs.
 
 **Rollout Phases:**
+
 ```
 Phase 1: Log (Week 1) - Identify FPs
 Phase 2: Challenge (Week 2) - Validate solve rate
@@ -934,17 +979,21 @@ Phase 4: Full Block (Week 4) - 100% traffic
 ```
 
 ### 19) Runbook (Prompt)
+>
 > Purpose, dependencies, normal/abnormal metrics, common FPs, emergency disable, escalation contacts, related rules.
 
 ### 20) Cost Analysis (Prompt)
+>
 > Estimate evaluation cost; reduce regex/body checks; consider Workers for heavy logic; evaluate plan-tier trade-offs.
 
 ---
 
-##  Phase 7: Workers Integration
+## Phase 7: Workers Integration
 
 ### 21) When to Use Workers vs Rules
+
 **Use Workers if:**
+
 - Need response body inspection
 - External API calls required
 - Stateful logic (KV/Durable Objects)
@@ -952,6 +1001,7 @@ Phase 4: Full Block (Week 4) - 100% traffic
 - Custom authentication flows
 
 **Use Rules if:**
+
 - Simple request filtering
 - Rate limiting
 - Header/path manipulation
@@ -959,6 +1009,7 @@ Phase 4: Full Block (Week 4) - 100% traffic
 - IP/geo blocking
 
 ### 22) Workers Pattern
+
 ```javascript
 // Complex authentication with Workers
 export default {
@@ -983,9 +1034,10 @@ export default {
 
 ---
 
-##  Phase 8: Multi-Environment Management
+## Phase 8: Multi-Environment Management
 
 ### 23) Environment Strategy
+
 ```hcl
 # Environment-specific behavior
 locals {
@@ -1008,6 +1060,7 @@ resource "cloudflare_ruleset" "admin" {
 ```
 
 ### 24) Feature Flags
+
 ```hcl
 variable "feature_flags" {
   type = map(bool)
@@ -1029,9 +1082,10 @@ dynamic "rules" {
 
 ---
 
-##  Phase 9: CI/CD Integration
+## Phase 9: CI/CD Integration
 
 ### 25) GitHub Actions Workflow
+
 ```yaml
 name: Cloudflare Rules CI
 
@@ -1073,9 +1127,10 @@ jobs:
 
 ---
 
-##  Security Hardening
+## Security Hardening
 
 ### Bypass Protection Patterns
+
 ```javascript
 //  HARDENED: Multiple encoding + case insensitive
 (
@@ -1093,9 +1148,10 @@ jobs:
 
 ---
 
-##  Monitoring & Analytics
+## Monitoring & Analytics
 
 ### GraphQL Queries
+
 ```graphql
 # Rule effectiveness
 {
@@ -1115,6 +1171,7 @@ jobs:
 ```
 
 ### Alerts
+
 ```yaml
 # Prometheus alerting
 - alert: HighRuleBlockRate
@@ -1126,9 +1183,10 @@ jobs:
 
 ---
 
-##  Incident Response
+## Incident Response
 
 ### Emergency Deployment
+
 ```bash
 # EMERGENCY: Deploy rule in < 2 minutes
 EXPRESSION='(http.request.uri.path eq "/api/login" and cf.threat_score gt 30)'
@@ -1143,6 +1201,7 @@ curl -X POST \
 ```
 
 ### Rollback Procedure
+
 ```bash
 # Disable rule immediately
 curl -X PATCH \
@@ -1159,38 +1218,43 @@ curl -X PATCH \
 
 ---
 
-##  Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
 **Rule Not Triggering:**
+
 1. Check if rule is enabled
 2. Verify rule order (earlier rules catch first)
 3. Test with simpler expression
 4. Check field names (case-sensitive)
 
 **Blocking Legitimate Traffic:**
+
 1. Add bypass for verified bots
 2. Change Block -> Managed Challenge
 3. Add allowlist for known IPs
 4. Use case-insensitive matching
 
 **Performance Issues:**
+
 1. Reorder conditions (fast -> slow)
 2. Replace regex with simpler operators
 3. Remove body inspection (use Workers)
 4. Split complex rule into multiple
 
 **Terraform Failures:**
+
 1. Unlock state: `terraform force-unlock <ID>`
 2. Import existing: `terraform import cloudflare_ruleset.x <id>`
 3. Refresh state: `terraform apply -refresh-only`
 
 ---
 
-##  Example Library
+## Example Library
 
 ### E-commerce Checkout
+
 ```javascript
 (
   http.host eq "shop.acme.com" and
@@ -1205,20 +1269,24 @@ curl -X PATCH \
 ```
 
 ### API Gateway Auth
+
+Use WAF expressions as coarse request filtering only. Enforce real API authentication in Cloudflare Access / mTLS / the application authorization layer.
+
 ```javascript
 (
   starts_with(http.request.uri.path, "/api/") and
   not (
     http.request.headers["authorization"][0] matches
       "^Bearer [A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+$" or
-    http.request.headers["x-api-key"][0] in {"key_abc123" "key_def456"} or
-    (ip.src in {10.0.0.0/8} and http.request.headers["x-service-name"][0] ne "")
+    cf.tls_client_auth.cert_verified or
+    ip.src in $trusted_service_egress_ips
   )
 )
 # Action: Block
 ```
 
 ### WordPress Hardening
+
 ```javascript
 (
   (contains(lower(http.request.uri.path), "wp-admin") and not ip.src in {1.1.1.0/24}) or
@@ -1230,6 +1298,7 @@ curl -X PATCH \
 ```
 
 ### GraphQL Protection
+
 ```javascript
 (
   http.request.uri.path eq "/graphql" and
@@ -1341,7 +1410,8 @@ resource "cloudflare_ruleset" "waf_custom" {
         starts_with(http.request.uri.path, "/api/v2/") and
         not (
           http.request.headers["authorization"][0] matches "^Bearer [A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+$" or
-          http.request.headers["x-api-key"][0] in {"key_abc123" "key_def456"}
+          cf.tls_client_auth.cert_verified or
+          ip.src in $trusted_service_egress_ips
         )
       )
     EOT
@@ -1660,6 +1730,7 @@ This section captures operational guidance for managed rules, attack score tunin
 
 > [!IMPORTANT]
 > Normalize terminology in source material before updating rules:
+>
 > - WAF (not "WTF" / "WFT")
 > - OWASP (not "OASP")
 > - DDoS (not "DOS")
@@ -1756,6 +1827,7 @@ Use attack score as a complement to managed rules, not a replacement.
 > Do not globally block all traffic below `50` based only on attack score. Combine with request context (host/path/method/bot signals) to reduce false positives.
 
 **Enterprise examples:**
+
 ```javascript
 # Global score gate for sensitive API paths
 (
@@ -1775,6 +1847,7 @@ Use attack score as a complement to managed rules, not a replacement.
 ```
 
 **Business example:**
+
 ```javascript
 (
   http.host eq "app.acme.com" and
@@ -1797,6 +1870,7 @@ flowchart LR
 ```
 
 Operational loop:
+
 1. Filter by host/path/action/source
 2. Validate whether issue is true positive or false positive
 3. Implement minimal rule/exception

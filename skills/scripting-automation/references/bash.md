@@ -790,7 +790,7 @@ readonly VERSION="1.0.0"
 readonly MAX_RETRIES=3
 readonly RETRY_DELAY=2
 readonly LOCK_FILE="/tmp/${SCRIPT_NAME}.lock"
-readonly LOG_FILE="${HOME}/log/${SCRIPT_NAME}_$(date -u +%Y%m%d_%H%M%S).log"
+readonly LOGFILE="${HOME}/log/${SCRIPT_NAME}_$(date -u +%Y%m%d_%H%M%S).log"
 
 # Logging
 log() {
@@ -798,7 +798,7 @@ log() {
   shift
   local timestamp
   timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-  echo "${timestamp} [${level}] $*" | tee -a "$LOG_FILE" >&2
+  printf "%s [%s] %s\n" "${timestamp}" "${level}" "$*" | tee -a "${LOGFILE}" >&2
 }
 
 log_info() { log "INFO" "$@"; }

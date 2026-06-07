@@ -4,11 +4,14 @@ The canonical testing path for Cloudflare Workers. Runs your tests inside the Wo
 
 **Versions (as of 2026):**
 
-- `@cloudflare/vitest-pool-workers` v0.13.x stable (March 2026)
+- `@cloudflare/vitest-pool-workers` v0.16.x stable
 - Requires `vitest` 4.1+ and `@vitest/runner` 4.1+
 - Wrangler 4.x (bundled with vitest-pool-workers as a dep)
 
 **Don't use** `unstable_dev` for new tests - it's deprecated; vitest-pool-workers replaces it.
+
+> [!IMPORTANT]
+> **v0.16 removed `defineWorkersConfig` and the `@cloudflare/vitest-pool-workers/config` subpath.** Configure with the `cloudflareTest()` Vite plugin instead (shown below). If you see `Missing "./config" specifier in "@cloudflare/vitest-pool-workers"`, you're on 0.16+ with the old config import.
 
 ---
 
@@ -23,21 +26,20 @@ npm install --save-dev @cloudflare/vitest-pool-workers vitest
 ### `vitest.config.ts`
 
 ```typescript
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.jsonc" },
-        // Optional: override or add miniflare config (takes precedence over wrangler.jsonc)
-        miniflare: {
-          // e.g., mock service bindings for tests
-          // serviceBindings: { AUTH: (req) => new Response("mocked") }
-        },
-      },
-    },
-  },
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+      // Optional: override or add miniflare config (takes precedence over wrangler.jsonc)
+      // miniflare: {
+      //   // e.g., mock service bindings for tests
+      //   // serviceBindings: { AUTH: (req) => new Response("mocked") }
+      // },
+    }),
+  ],
 });
 ```
 
@@ -49,10 +51,9 @@ Create a tests-specific tsconfig (e.g., `test/tsconfig.json`) or extend the main
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "types": [
-      "@cloudflare/vitest-pool-workers",
-      "@cloudflare/workers-types/2026-04-01"
-    ]
+    // `/types` declares the `cloudflare:test` module; the Workers runtime
+    // globals come from the included worker-configuration.d.ts.
+    "types": ["@cloudflare/vitest-pool-workers/types"]
   },
   "include": [
     "./**/*.ts",
@@ -61,7 +62,7 @@ Create a tests-specific tsconfig (e.g., `test/tsconfig.json`) or extend the main
 }
 ```
 
-`@cloudflare/vitest-pool-workers` provides types for the `cloudflare:test` module (the `SELF` fetcher, `env`, `runInDurableObject`, etc.).
+`@cloudflare/vitest-pool-workers/types` provides types for the `cloudflare:test` module (the `SELF` fetcher, `env`, `runInDurableObject`, etc.).
 
 ---
 

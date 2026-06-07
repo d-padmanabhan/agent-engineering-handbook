@@ -147,21 +147,25 @@ set_flag() { declare -g BUILD_FLAG=1; }
 
 ```bash
 # Colors (check if terminal supports them)
-if [[ -t 1 ]]; then
-    readonly RED='\033[0;31m'
-    readonly GREEN='\033[0;32m'
-    readonly YELLOW='\033[0;33m'
-    readonly BLUE='\033[0;34m'
-    readonly NC='\033[0m'  # No Color
+if [[ -t 2 ]]; then
+  readonly RED=$'\033[0;31m'
+  readonly GREEN=$'\033[0;32m'
+  readonly YELLOW=$'\033[0;33m'
+  readonly BLUE=$'\033[0;34m'
+  readonly NC=$'\033[0m'
 else
-    readonly RED='' GREEN='' YELLOW='' BLUE='' NC=''
+  readonly RED=''
+  readonly GREEN=''
+  readonly YELLOW=''
+  readonly BLUE=''
+  readonly NC=''
 fi
 
 # Logging functions
-log() { echo -e "${BLUE}[INFO]${NC} $*" >&2; }
-success() { echo -e "${GREEN}[OK]${NC} $*" >&2; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
-error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+log() { printf "%s[INFO]%s %s\n" "${BLUE}" "${NC}" "$*" >&2; }
+success() { printf "%s[OK]%s %s\n" "${GREEN}" "${NC}" "$*" >&2; }
+warn() { printf "%s[WARN]%s %s\n" "${YELLOW}" "${NC}" "$*" >&2; }
+error() { printf "%s[ERROR]%s %s\n" "${RED}" "${NC}" "$*" >&2; }
 
 # Progress indicator
 spinner() {

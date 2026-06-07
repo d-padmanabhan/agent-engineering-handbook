@@ -82,8 +82,9 @@ if (value === 0) { }  // true only for: 0
 
 ### Essential Commands
 ```bash
-npm ci                        # Clean install (CI)
-npm audit                     # Check vulnerabilities
+corepack enable               # Use packageManager from package.json
+pnpm install --frozen-lockfile # Clean install (CI)
+pnpm audit                    # Check vulnerabilities (or use SCA in CI)
 npm test -- --coverage        # Run tests with coverage
 node --inspect app.js         # Start debugger
 node --prof app.js            # Generate profiling data
@@ -127,6 +128,91 @@ element.innerHTML = userInput;              //  BAD (XSS)
 * **Documentation:** Use **JSDoc** types for all exported APIs
 * **Error Handling:** Add error handling around I/O (FS, network, JSON parse)
 * **Testing:** Include tests for non-trivial logic
+
+## Non-Negotiables
+
+### NN-1: Type-check JavaScript or use TypeScript
+
+New production application/library code should prefer TypeScript. Plain JavaScript is acceptable for scripts, config files, legacy packages, or runtime/tooling constraints, but it MUST use `// @ts-check` plus JSDoc types for exported APIs and complex values.
+
+Reject in review:
+
+- New production `.js` modules without `// @ts-check`
+- Exported functions/classes without JSDoc types
+- `any`-equivalent JSDoc such as `@param {*} data` without immediate runtime validation
+- Public APIs that accept unvalidated `unknown`/untyped input
+
+### NN-2: Network calls require timeout, status checks, and runtime validation
+
+Every `fetch`/HTTP call that crosses a trust boundary MUST:
+
+1. Apply a timeout (`AbortSignal.timeout(...)` or `AbortController` fallback).
+2. Check `response.ok`.
+3. Parse JSON in a controlled path.
+4. Validate the parsed shape with a schema validator or explicit type guard before using it.
+5. Retry only idempotent operations, with capped backoff and jitter.
+
+```js
+// @ts-check
+import { z } from 'zod';
+
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+});
+
+/**
+ * @param {string} userId
+ * @returns {Promise<z.infer<typeof UserSchema>>}
+ */
+export async function fetchUser(userId) {
+  const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+    signal: AbortSignal.timeout(5_000),
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`fetch user failed: HTTP ${response.status}`);
+  }
+
+  return UserSchema.parse(await response.json());
+}
+```
+
+Reject in review:
+
+- `return response.json()` from remote data without validation
+- `const data = await response.json()` followed by unchecked property access
+- `fetch(url)` with no timeout for service code
+- retries around non-idempotent requests unless idempotency keys are used
+
+### NN-3: Node HTTP servers are production-hardened
+
+Production Node/Express servers MUST set body limits, security headers, explicit CORS policy, request IDs, structured logging, and graceful shutdown. Do not call `app.listen(...)` directly in examples meant for production services.
+
+Reject in review:
+
+- `express.json()` with no `limit`
+- wildcard CORS on credentialed/private APIs
+- missing `helmet` or equivalent security headers
+- missing graceful shutdown on `SIGTERM`/`SIGINT`
+- returning raw internal errors to clients
+
+### NN-4: Package manager and Node version are pinned
+
+New packages MUST declare the package manager and Node version policy:
+
+```json
+{
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
+```
+
+CI should enable Corepack and use the repo's package manager (`pnpm install --frozen-lockfile`, not `npm install`). Use the current LTS and previous LTS only when the package intentionally supports both.
 
 **For reviews:**
 
@@ -1149,20 +1235,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 21]
+        node-version: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - run: npm ci
-      - run: npm run lint
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
       - run: npx tsc --noEmit  # Type check
-      - run: npm test -- --coverage
-      - run: npm audit --audit-level=high
+      - run: pnpm test -- --coverage
+      - run: pnpm audit --audit-level=high
 ```
 
 ---
@@ -1505,7 +1592,9 @@ async function createApp() {
   const express = (await import('express')).default;
   const app = express();
 
-  app.use(express.json());
+  app.disable('x-powered-by');
+  // Add helmet(), explicit cors({ origin: [...] }), rate limiting, and request IDs in production.
+  app.use(express.json({ limit: '1mb' }));
 
   const repository = new UserRepository();
   const service = new UserService(repository);
@@ -1530,5 +1619,5 @@ export { UserService, UserRepository, ValidationError, NotFoundError, createApp 
 - ✅ Type-safe API handlers
 - ✅ Proper error responses
 
-**Node.js Version**: 18+ (LTS)
+**Node.js Version**: 22+ (current LTS baseline)
 **ES Version**: ES2022

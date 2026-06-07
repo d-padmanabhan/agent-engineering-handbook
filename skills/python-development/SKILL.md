@@ -65,6 +65,29 @@ Reject in review:
 - New code targeting Python 3.10 or below for any reason
 - CI, Docker, or Lambda runtime config pinned below Python 3.14 for new app / service / Lambda code
 
+### NN-2: Leading underscores mean non-public API
+
+Do not prefix functions, methods, classes, variables, modules, or packages with `_` unless they are intentionally internal implementation details. Public behavior gets public names.
+
+```python
+# Public API, public name
+def validate_order(order: Order) -> None:
+    ...
+
+
+# Internal helper, module-private name
+def _normalize_order_id(raw_order_id: str) -> str:
+    ...
+```
+
+Reject in review:
+
+- `_process_data()`, `_validate_input()`, or `_build_payload()` called directly from other modules
+- Public classes / modules named `_Client`, `_Service`, `_helpers`, or similar
+- Double-underscore methods (`__method`) unless name-mangling is intentionally required
+- Invented dunder names such as `__process__` or `__validate__`
+- Leading underscore added merely because the function is small or "helper-ish"
+
 ## Standards Quick Reference
 
 | Aspect | Standard |
@@ -76,6 +99,55 @@ Reject in review:
 | **Type Hints** | Strict typing required |
 | **Docstrings** | Google-style |
 | **Package Manager** | `uv` (preferred) |
+
+## Documentation Contract
+
+For new scripts, place the module-level docstring immediately below the shebang, with one blank line between them. The module docstring must explain the script's purpose, provide a short overview, include a numbered workflow when there are multiple steps, and include CLI usage examples when the file is meant to be run directly. AWS Lambda handlers and import-only modules do not need CLI usage examples.
+
+```python
+#!/usr/bin/env -S uv run
+"""
+Process user export files and publish normalized records.
+
+This script reads a JSON export, validates each record, writes a cleaned
+CSV file, and optionally uploads the result to object storage.
+
+Workflow:
+1. Parse command-line arguments.
+2. Validate input file and output directory.
+3. Load and validate JSON records.
+4. Write normalized CSV output.
+5. Upload the result when --upload is set.
+
+Usage:
+    python process_users.py --input users.json --output users.csv
+    python process_users.py --input users.json --output users.csv --upload
+"""
+```
+
+Every public function, class, and method must use Google-style docstrings. Put the description on a new line after the opening triple quotes, then document arguments, return value, raised exceptions, and examples when helpful.
+
+```python
+def load_users(input_path: Path) -> list[User]:
+    """
+    Load user records from a JSON file.
+
+    Args:
+        input_path (Path): Path to the JSON file containing user records.
+
+    Returns:
+        list[User]: Validated user records parsed from the input file.
+
+    Raises:
+        FileNotFoundError: If the input file does not exist.
+        ValueError: If the file contains invalid JSON or invalid user records.
+
+    Example:
+        users = load_users(Path("users.json"))
+    """
+```
+
+Inline comments are for complex logic, non-obvious tradeoffs, or external constraints. Do not comment obvious assignments or restate function names.
 
 ## Type Hints
 

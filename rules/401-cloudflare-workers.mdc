@@ -86,7 +86,7 @@ Secrets are bindings; they appear in `env` like any other binding but are not wr
 # Create / rotate
 wrangler secret put API_KEY                # prompts for value
 wrangler secret put API_KEY --env production
-echo "$VALUE" | wrangler secret put API_KEY   # CI pattern
+wrangler secret put API_KEY < /run/secrets/api_key
 
 # List (names only; values never returned)
 wrangler secret list

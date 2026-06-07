@@ -16,7 +16,7 @@ description: Docker and container orchestration best practices for production-re
 
 | Aspect | Standard |
 |--------|----------|
-| **Base Images** | Official, pinned versions (`python:3.12.1-slim`) |
+| **Base Images** | Official, pinned versions (`python:3.14.0-slim`) |
 | **Multi-Stage** | Required for compiled languages (Go, Rust, C++) |
 | **User** | Run as non-root (use `USER node` or create user) |
 | **Health Checks** | Always include `HEALTHCHECK` instruction |
@@ -29,7 +29,7 @@ description: Docker and container orchestration best practices for production-re
 
 ```dockerfile
 # ✅ GOOD - Official, minimal, secure
-FROM python:3.12-slim
+FROM python:3.14-slim
 FROM node:20-alpine
 
 # ⭐ EXCELLENT - Distroless for production
@@ -44,7 +44,7 @@ FROM ubuntu:latest
 
 ```dockerfile
 # ✅ GOOD - Explicit version pinning
-FROM python:3.12.1-slim-bookworm
+FROM python:3.14.0-slim-bookworm
 FROM node:20.10.0-alpine3.19
 
 # ❌ BAD - Unpredictable, non-reproducible
@@ -58,7 +58,7 @@ FROM node:alpine
 
 ```dockerfile
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -80,7 +80,7 @@ ENTRYPOINT ["/main"]
 
 ```dockerfile
 # Build stage
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
 # Install build dependencies
@@ -93,7 +93,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Production stage
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Copy Python dependencies from builder
@@ -118,7 +118,7 @@ CMD ["python", "-m", "src.main"]
 
 ```dockerfile
 # ✅ GOOD - Least changing first, most changing last
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # System dependencies (rarely change)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -163,7 +163,7 @@ COPY src/ ./src/
 ### Run as Non-Root User
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Create non-root user
@@ -197,7 +197,7 @@ CMD ["python", "-m", "src.main"]
 ### Application Health Check
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 COPY requirements.txt .
@@ -302,7 +302,7 @@ secrets:
 **Python:**
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 COPY requirements.txt .
