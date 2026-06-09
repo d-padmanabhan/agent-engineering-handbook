@@ -47,7 +47,7 @@ repos:
 
   # Link checking (manual - can be slow/flaky depending on network)
   - repo: https://github.com/lycheeverse/lychee
-    rev: nightly
+    rev: v0.15.1
     hooks:
       - id: lychee
         name: Lychee (link checker)
