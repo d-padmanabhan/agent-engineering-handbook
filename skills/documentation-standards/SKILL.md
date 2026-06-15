@@ -133,6 +133,19 @@ Prefer clickable same-repo references:
 - **Static (Markdown):** Mermaid in this skill and in `rules/800-markdown.mdc`.
 - **Interactive (React SPA):** `@xyflow/react` patterns, playbook, and rule **`rules/815-reactflow-diagrams.mdc`** - use skill **`skills/reactflow-architecture-diagrams/`**. See [references/static-vs-interactive.md](../reactflow-architecture-diagrams/references/static-vs-interactive.md) for a short comparison table.
 
+### AI diagram tooling
+
+Prefer tools that preserve a code-owned source of truth. Mermaid text in the repo is easiest to review, diff, and maintain.
+
+| Tool | Best fit | Round-trip / ownership guidance |
+|---|---|---|
+| **Mermaid Chart AI** | Best fit for engineering-maintained diagrams | Generates/refines standard Mermaid and can export PNG, SVG, or MMD. Keep the `.mmd` / Mermaid block in the repo as source of truth. |
+| **Eraser** | Good for nicer engineering visuals | Can import Mermaid and export PNG/SVG/PDF. Mermaid round-tripping is weaker, so treat exported Mermaid as a starting point and review manually. |
+| **Lucidchart AI** | Good for polished business-friendly diagrams | Supports Mermaid input, but generated diagrams are not ideal for code-based round-tripping. Use for stakeholder diagrams, not canonical repo-maintained architecture diagrams. |
+| **Napkin AI** | Best for presentation / infographic visuals | Exports PNG/SVG/PPT/PDF, but not Mermaid. Use for slides or narrative visuals, not engineering diagrams that must remain code-owned. |
+
+Rule of thumb: if future maintainers need to edit it in Git, use Mermaid (or React Flow for interactive SPA diagrams). If the artifact is for a deck or executive narrative, exported visuals are acceptable as generated artifacts.
+
 ## Mermaid Diagrams
 
 ### Flowchart

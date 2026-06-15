@@ -1,6 +1,6 @@
 # Databricks Workspace Bootstrap
 
-Terraform-driven setup for account, workspaces, Unity Catalog, groups, policies, and cost controls.
+Terraform-driven setup for account, workspaces, Unity Catalog, groups, policies, system tables, and cost controls.
 
 ---
 
@@ -10,6 +10,7 @@ Terraform-driven setup for account, workspaces, Unity Catalog, groups, policies,
 - Cloud subscription (AWS / Azure / GCP) with privileges to create IAM, networking, KMS, storage
 - IdP for SSO + SCIM (Okta / Entra / Google)
 - `databricks` Terraform provider configured with account- and workspace-level aliases
+- Databricks CLI configured for Declarative Automation Bundles deployments
 
 ---
 
@@ -42,7 +43,7 @@ terraform/
 resource "databricks_metastore" "this" {
   provider      = databricks.account
   name          = "primary-us-east-1"
-  storage_root  = "s3://company-uc-metastore-us-east-1/"
+  storage_root  = "s3://acme-uc-metastore-us-east-1/"
   region        = "us-east-1"
   owner         = "admins-account"
 }
@@ -110,7 +111,7 @@ resource "databricks_storage_credential" "prod_uc" {
 
 resource "databricks_external_location" "prod_raw" {
   name           = "prod-raw"
-  url            = "s3://company-prod-uc/raw/"
+  url            = "s3://acme-prod-uc/raw/"
   credential_name = databricks_storage_credential.prod_uc.name
 }
 
@@ -152,6 +153,8 @@ resource "databricks_cluster_policy" "interactive_medium" {
   name = "interactive-medium"
   definition = jsonencode({
     "spark_version"        = { "type": "fixed", "value": "14.3.x-scala2.12" },
+    # Provider-level field/value may vary by Databricks provider version.
+    # Human-facing policy: Standard access mode for most UC workloads.
     "data_security_mode"   = { "type": "fixed", "value": "USER_ISOLATION" },
     "node_type_id"         = { "type": "allowlist", "values": ["i3.xlarge", "i3.2xlarge"] },
     "autotermination_minutes" = { "type": "range", "minValue": 15, "maxValue": 60 },
@@ -209,7 +212,7 @@ No long-lived tokens or cloud credentials in notebooks. Pull from scopes.
 ## CI / Deployment
 
 - Terraform: plan + apply via CI on merge to `main`; pinned provider versions
-- Databricks Asset Bundles (DABs) for notebooks / jobs / DLT pipelines: deploy per env
+- Declarative Automation Bundles (formerly Databricks Asset Bundles) for notebooks / jobs / Lakeflow pipelines: validate and deploy per env
 - Pre-deploy tests (unit) and post-deploy smoke tests (integration against a dev catalog)
 
 ---
@@ -224,8 +227,10 @@ No long-lived tokens or cloud credentials in notebooks. Pull from scopes.
 - [ ] External locations for cloud storage; no mounts / DBFS for persistent data
 - [ ] Cluster policies for all user-facing compute
 - [ ] Job compute policies separate from interactive
+- [ ] Standard access mode default; Dedicated access mode exception documented
 - [ ] Tags enforced; billable attribution
 - [ ] System tables enabled; cost dashboard built
 - [ ] Budgets and alerts configured
 - [ ] Secrets via Key Vault / Secrets Manager scopes
 - [ ] Audit (system.access.audit) streamed to SIEM
+- [ ] Declarative Automation Bundles validate/deploy path configured for jobs and pipelines

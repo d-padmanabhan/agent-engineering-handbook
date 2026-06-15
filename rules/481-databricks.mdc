@@ -1,6 +1,6 @@
 ---
 title: Databricks Engineering Ruleset
-description: Databricks (Spark/Delta/Unity Catalog/DLT) patterns for safe, performant, governable data pipelines.
+description: Databricks (Spark/Delta/Unity Catalog/Lakeflow Spark Declarative Pipelines) patterns for safe, performant, governable data and AI workloads.
 priority: 481
 alwaysApply: false
 files:
@@ -15,12 +15,78 @@ files:
 
 # Databricks Engineering Ruleset
 
-**Audience**: engineers building Databricks jobs, notebooks, and Delta Lake tables
+**Audience**: engineers building Databricks jobs, notebooks, Lakeflow pipelines, SQL warehouses, Delta Lake tables, and governed AI/data workloads
 
 **Goal**: reliable pipelines with predictable performance, governed access, and safe maintenance
 
 > [!IMPORTANT]
 > Default to a **Lakehouse** mental model: bronze/silver/gold (or raw/curated/serving), with explicit contracts between layers.
+>
+> [!NOTE]
+> Current Databricks terminology: **Lakeflow Spark Declarative Pipelines** is the current product name for what was formerly **Delta Live Tables (DLT)**. Existing `dlt` code still works, but new examples should prefer `from pyspark import pipelines as dp`. **Declarative Automation Bundles** is the current name for what was formerly **Databricks Asset Bundles (DABs)**.
+
+---
+
+## Non-negotiables
+
+### NN-1: Unity Catalog is required for production
+
+Production data and AI assets use Unity Catalog. Hive metastore is a legacy migration source only.
+
+Reject in review:
+
+- `USE CATALOG hive_metastore` in production code
+- persistent data under DBFS mounts (`dbfs:/mnt/...`) instead of Unity Catalog volumes / external locations
+- grants to `account users` or individual owners for production data
+- tables, volumes, functions, or models without group/service-principal ownership
+
+### NN-2: Standard access mode by default; Dedicated only by exception
+
+Use **Standard** access mode for most Unity Catalog workloads. Use **Dedicated** only for workloads that need capabilities Standard does not support (for example some ML/GPU/R/RDD patterns), and document the reason.
+
+Reject in review:
+
+- No-isolation shared compute for governed production workloads
+- legacy credential passthrough in Unity Catalog workspaces
+- interactive all-purpose clusters running scheduled production jobs
+
+### NN-3: Declarative Automation Bundles for deployable projects
+
+Use **Declarative Automation Bundles** (formerly Databricks Asset Bundles) for jobs, Lakeflow pipelines, notebooks, and deployment metadata that must move across environments. Terraform still owns account/workspace infrastructure; bundles own deployable Databricks project resources.
+
+CI must run:
+
+```bash
+databricks bundle validate --target dev
+databricks bundle deploy --target staging
+```
+
+Reject in review:
+
+- manual production deploys from notebooks
+- bundle changes without validation in CI
+- deploys not tied to a Git commit / bundle version
+
+### NN-4: No personal access tokens for automation
+
+Automation uses service principals, OAuth, OIDC/workload identity, or cloud-native identity where supported. Personal access tokens are break-glass only and must be short-lived, audited, and rotated.
+
+Reject in review:
+
+- PATs in notebooks, repos, job parameters, or CI variables
+- long-lived user tokens for production jobs
+- service principals with workspace/admin rights beyond their workload
+
+### NN-5: System tables, lineage, and tags are operational requirements
+
+Production workspaces enable system tables for billing, audit, lineage, query history, and compute observability. Tables and volumes carry owner, sensitivity, environment, and cost tags before serving/gold publication.
+
+Reject in review:
+
+- no cost dashboard from `system.billing.usage`
+- no audit stream from `system.access.audit`
+- PII/PCI data without tags, masks, or row filters where required
+- no alerting on privilege changes, token creation, failed jobs, or expectation failures
 
 ---
 
@@ -83,7 +149,7 @@ files:
 
 ---
 
-## Streaming and DLT
+## Streaming and Lakeflow pipelines
 
 ### Streaming correctness
 
@@ -92,9 +158,18 @@ files:
   - watermark policy
   - dedupe strategy (if applicable)
 
-### DLT expectations (data quality)
+### Lakeflow expectations (data quality)
 
-- Encode critical invariants as DLT expectations (drop/quarantine/fail).
+- Encode critical invariants as Lakeflow / DLT expectations (drop/quarantine/fail).
+
+### DLT to Lakeflow terminology
+
+- Existing `import dlt` pipelines continue to work.
+- New Python examples prefer `from pyspark import pipelines as dp`.
+- Use `@dp.table` for streaming tables.
+- Use `@dp.materialized_view` for batch materialized views.
+- Use `@dp.temporary_view` instead of `@dlt.view`.
+- Use `dp.create_auto_cdc_flow(...)` for CDC patterns that previously used `dlt.apply_changes(...)`.
 
 > [!TIP]
 > Prefer “quarantine and alert” for non-critical issues; “fail pipeline” for contract violations that would corrupt downstream truth.
@@ -106,12 +181,14 @@ files:
 - Use Databricks secret scopes (or external secret managers) for credentials.
 - Never hardcode secrets in notebooks or repos.
 - For external systems (Kafka, Snowflake, APIs), prefer service principals and short-lived credentials where possible.
+- Do not pass secrets through widgets, notebook parameters, DBFS files, or job parameters.
 
 ---
 
 ## Code organization
 
 - Prefer **jobs** + version-controlled code over ad-hoc notebooks for production.
+- Prefer **Declarative Automation Bundles** for deployable Databricks jobs and Lakeflow pipelines.
 - If notebooks are used:
   - keep them thin (orchestration/visualization) and call shared libraries
   - externalize config (widgets/env) and make runs reproducible
@@ -121,9 +198,11 @@ files:
 ## Review checklist (quick)
 
 - [ ] Delta/UC choices are explicit (catalog/schema/table; grants)
+- [ ] Standard vs Dedicated access mode is intentional; no no-isolation shared compute
+- [ ] Deployable jobs/pipelines are managed by Declarative Automation Bundles or Terraform
 - [ ] Idempotency and replay strategy is clear (upsert/dedupe/watermark)
 - [ ] No driver blowups (`collect/toPandas` on big data)
 - [ ] Joins and partitioning are intentional (pruning likely)
 - [ ] Maintenance ops are safe (`VACUUM` policy validated)
 - [ ] Secrets are handled via scopes / managed auth
-
+- [ ] System tables, lineage, tags, and audit outputs are enabled for production
