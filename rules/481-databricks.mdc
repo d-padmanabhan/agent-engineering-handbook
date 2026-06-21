@@ -189,6 +189,7 @@ Reject in review:
 
 - Prefer **jobs** + version-controlled code over ad-hoc notebooks for production.
 - Prefer **Declarative Automation Bundles** for deployable Databricks jobs and Lakeflow pipelines.
+- If work started in the Databricks workspace and is not in Git, export it with Databricks CLI before refactoring or deployment.
 - If notebooks are used:
   - keep them thin (orchestration/visualization) and call shared libraries
   - externalize config (widgets/env) and make runs reproducible
@@ -199,6 +200,7 @@ Reject in review:
 
 - [ ] Delta/UC choices are explicit (catalog/schema/table; grants)
 - [ ] Standard vs Dedicated access mode is intentional; no no-isolation shared compute
+- [ ] Workspace-only notebooks/files were exported into Git before refactor/deployment
 - [ ] Deployable jobs/pipelines are managed by Declarative Automation Bundles or Terraform
 - [ ] Idempotency and replay strategy is clear (upsert/dedupe/watermark)
 - [ ] No driver blowups (`collect/toPandas` on big data)

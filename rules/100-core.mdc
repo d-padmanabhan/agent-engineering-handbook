@@ -96,6 +96,21 @@ def process_user_data(user_id: int, data: dict[str, Any]) -> dict[str, Any]:
   * **Company/Organization:** Use `ACME` or `Acme` as the example company/organization name.
   * **Consistency:** Apply this convention across all code examples, documentation, configuration files, and test data.
 
+## Non-negotiable: verify current vendor docs
+
+For vendor, cloud, SDK, API, CLI, IaC provider, runtime, security, or auth behavior, do **not** rely on model memory alone. Verify against current official documentation, release notes, provider schemas, CLI `--help`, repository releases, or the installed tool before recommending syntax, defaults, versions, limits, or architecture patterns.
+
+Use this especially for:
+
+- Cloud platforms and SaaS: AWS, Azure, GCP, Cloudflare, Databricks, Snowflake, Okta
+- IaC providers: Terraform, Pulumi, CloudFormation, Helm charts, Kubernetes APIs
+- Runtimes and toolchains: Python, Node.js, Go, Rust, Java, package managers
+- CI/CD surfaces: GitHub Actions versions, setup actions, auth/OIDC patterns
+- Security/auth/IAM behavior: OAuth/OIDC/SAML, workload identity, IAM, API gateways
+- Renamed or fast-moving products: e.g., DLT -> Lakeflow, Databricks Asset Bundles -> Declarative Automation Bundles
+
+If legacy guidance is intentionally retained, label it as **legacy**, explain when it still applies, and keep the current pattern nearby.
+
 **Tooling Baseline (CI/Lint/Format):**
 
   * **Python:** `ruff` + `black` (fixed line length), `ty` or `mypy --strict` (type checking), `pip-audit`, pylint (≥9.0)

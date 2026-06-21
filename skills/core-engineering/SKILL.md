@@ -95,6 +95,21 @@ The agent (an LLM in Cursor / Claude / Codex / etc.) is a fast, persuasive, part
 4. **Bound the autonomy.** Long-running agent tasks need HITL gates before destructive or irreversible steps. See [zero-trust skill / hitl-gates](../zero-trust/references/hitl-gates.md).
 5. **The "would a senior engineer have written this" test.** If the answer is no, edit before merging.
 
+### Current vendor docs are mandatory
+
+For vendor, cloud, SDK, API, CLI, IaC provider, runtime, security, or auth behavior, do **not** rely on model memory alone. Verify current official docs, release notes, provider schemas, CLI `--help`, repository releases, or installed tool output before recommending syntax, defaults, versions, limits, or architecture patterns.
+
+Use this especially for:
+
+- Cloud and data platforms: AWS, Azure, GCP, Cloudflare, Databricks, Snowflake, Okta
+- IaC/provider APIs: Terraform, Pulumi, CloudFormation, Kubernetes, Helm
+- Runtimes and package managers: Python, Node.js, Go, Rust, Java, pnpm/npm/uv
+- CI/CD surfaces: GitHub Actions versions, setup actions, OIDC/auth patterns
+- Security/auth/IAM behavior: OAuth/OIDC/SAML, workload identity, IAM, API gateways
+- Renamed or fast-moving products: e.g., DLT -> Lakeflow, Databricks Asset Bundles -> Declarative Automation Bundles
+
+If legacy guidance is intentionally retained, label it as **legacy**, explain when it still applies, and keep the current pattern nearby.
+
 **Slop smells in agent output (cut on sight):**
 
 - Words like "robust", "leverage", "seamless", "comprehensive", "best-of-breed" → almost always filler.

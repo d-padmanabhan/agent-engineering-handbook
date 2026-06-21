@@ -287,6 +287,59 @@ Then grant `CAN_USE` to the right group.
    - Streamed to SIEM; retention per policy
    - Alerts on privilege changes, admin role grants, token creation
 
+## Workflow 7 - Export Workspace Assets into Git
+
+Use when notebooks/files/workspace assets exist only in the Databricks workspace and are not yet in a Git folder or repo. Export first, then refactor.
+
+### When to use
+
+- A team built notebooks directly in `/Workspace/Users/...`
+- A demo or prototype needs to become maintainable source
+- A workspace-only notebook is about to be converted to a job or Lakeflow pipeline
+- A review needs a diffable source snapshot before cleanup
+
+### Steps
+
+1. **Inventory workspace paths**:
+
+   ```bash
+   databricks workspace list /Workspace/Users/<user> --absolute
+   databricks workspace list /Workspace/Shared/<project> --absolute
+   ```
+
+2. **Export the workspace directory**:
+
+   ```bash
+   mkdir -p workspace-export
+   databricks workspace export-dir \
+     /Workspace/Users/<user>/<project> \
+     ./workspace-export/<project> \
+     --overwrite
+   ```
+
+3. **Review exported formats**:
+   - notebooks/files should be source-reviewable (`.py`, `.scala`, `.sql`, `.ipynb` depending on workspace format and export behavior)
+   - remove generated output/noise before committing
+   - do not export secrets, outputs containing credentials, or ad-hoc data dumps
+
+4. **Commit exported source before refactoring** so cleanup has a baseline diff.
+5. **Convert deployable assets** to Declarative Automation Bundles or Terraform:
+   - jobs / tasks / pipelines -> bundle YAML
+   - workspace permissions / groups / policies -> Terraform or account-level automation
+   - notebooks -> thin orchestration over versioned Python/SQL libraries
+6. **Lock down workspace edits** after migration:
+   - repo/bundle becomes source of truth
+   - direct workspace edits are break-glass only
+   - production runs use deployed jobs/bundles, not ad-hoc notebook state
+
+### What `workspace export-dir` does not capture
+
+`databricks workspace export-dir` is useful for notebooks and workspace files. It does **not** fully capture jobs, permissions, clusters, SQL warehouses, secrets, Unity Catalog objects, alerts, dashboards, or pipelines as deployable infrastructure. Move those to Declarative Automation Bundles, Terraform, SQL, or API-managed configuration.
+
+**Deliverable:** exported source committed to Git, plus a migration plan from workspace-only assets to bundle/Terraform-managed assets.
+
+---
+
 ## Workflow 8 - Declarative Automation Bundles CI/CD
 
 Use Declarative Automation Bundles (formerly Databricks Asset Bundles) for deployable Databricks projects.
@@ -320,7 +373,7 @@ For ML and AI workloads:
 
 ---
 
-## Workflow 7 - Recovery via Delta Time Travel
+## Workflow 10 - Recovery via Delta Time Travel
 
 Delta tables preserve history; `RESTORE` brings you back.
 
