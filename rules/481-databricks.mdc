@@ -88,6 +88,18 @@ Reject in review:
 - PII/PCI data without tags, masks, or row filters where required
 - no alerting on privilege changes, token creation, failed jobs, or expectation failures
 
+### NN-6: Governance topology is designed before objects are created
+
+Define metastore, catalog, schema, storage, workspace binding, and ownership patterns before creating production objects. Retrofitting governance after ad-hoc catalogs exist is expensive and error-prone.
+
+Reject in review:
+
+- catalogs created without an ownership model
+- catalog names that do not encode domain/environment/region intent
+- workspace-catalog binding not documented for regulated catalogs
+- external locations with overlapping paths
+- row/column security implemented only with scattered dynamic views when ABAC/row filters/column masks would scale better
+
 ---
 
 ## Table format and governance defaults
@@ -105,9 +117,44 @@ Reject in review:
   - **catalog.schema.table** naming
   - least-privilege grants to groups/service principals
   - managed/external locations with clear ownership
+- Model catalog topology from organization structure:
+  - business domain / business unit
+  - environment (`dev`, `stage`, `prod`)
+  - region / data residency boundary
+  - cross-domain shared data products
+- Choose a topology deliberately:
+  - **Direct separation** (`finance_prod`, `finance_stage`, `finance_dev`) for stronger environment isolation and workspace binding
+  - **Indirect separation** (`finance` catalog with `prod_*`, `stage_*`, `dev_*` schemas) when team autonomy and fewer catalogs matter more
+- Prefer groups or service principals as owners. Avoid individual owners for production catalogs, schemas, tables, volumes, and models.
 
 > [!CAUTION]
 > Avoid “workspace-local” permissions for production data. Use UC grants and auditable groups.
+
+### Ownership, MANAGE, and delegation
+
+- `OWNER` is unique and has full control, including ownership transfer.
+- `MANAGE` is delegation without implicit data access: it can grant/revoke permissions but does not automatically grant `SELECT`, `MODIFY`, or ownership transfer.
+- Delegate with groups:
+  - metastore admin delegates `CREATE CATALOG`
+  - catalog owners create catalogs/schemas
+  - catalog/schema owners grant `MANAGE` to team lead groups
+- Production ownership should land on groups/service principals, not humans.
+
+### Privilege inheritance and metadata-only access
+
+To query a table, users need the full privilege chain:
+
+1. `USE CATALOG` on the catalog
+2. `USE SCHEMA` on the schema
+3. `SELECT` on the table/view
+
+Higher-level grants inherit downward. Use this to grant at the highest safe boundary, not per table by default.
+
+Metadata-only privileges:
+
+- `BROWSE` enables discovery without data access.
+- `APPLY TAG` enables stewardship/classification without data access.
+- `MANAGE` enables delegated permission administration without ownership.
 
 ---
 
@@ -149,6 +196,38 @@ Reject in review:
 
 ---
 
+## Storage governance: managed locations, external locations, volumes, federation
+
+### Managed storage location hierarchy
+
+Unity Catalog resolves managed storage from most specific to least specific:
+
+1. Schema managed location
+2. Catalog managed location
+3. Metastore default storage
+
+Use schema-level managed locations for regulated data that needs physical isolation. Use catalog-level managed locations for domain/environment separation. Keep metastore default storage as the catch-all, not the primary governance tool.
+
+### Tables vs volumes
+
+- Use **tables** for tabular data governed through SQL/Spark (`catalog.schema.table`).
+- Use **volumes** for non-tabular files (PDFs, images, configs, ML artifacts, documents) governed through `/Volumes/catalog/schema/volume/...`.
+- Prefer Unity Catalog volumes over direct cloud paths for governed file access.
+- Managed tables/volumes have lifecycle controlled by UC; external tables/volumes leave data in cloud storage after metadata deletion.
+
+### Storage credentials and external locations
+
+- Storage credentials centralize cloud access. Do not distribute IAM keys, service account keys, or cloud secrets into notebooks.
+- External locations pair one credential with one cloud path.
+- External location paths must not overlap; one path maps to one governed location.
+- External tables follow the chain: storage credential -> external location -> table.
+
+### Lakehouse Federation / foreign catalogs
+
+Use foreign catalogs to expose external systems through Unity Catalog when copying data is not yet justified. Treat federation as governed access, not as a replacement for curated Delta tables when performance, reliability, or data-product ownership requires local managed data.
+
+---
+
 ## Streaming and Lakeflow pipelines
 
 ### Streaming correctness
@@ -176,6 +255,42 @@ Reject in review:
 
 ---
 
+## Fine-grained access control (FGAC) and ABAC
+
+### Row filters, column masks, and dynamic views
+
+- Prefer **row filters** and **column masks** for table-attached FGAC.
+- Use row filters to control which rows are visible.
+- Use column masks to control how sensitive values appear.
+- Use dynamic views for legacy compatibility or special cases where table-attached policies cannot express the rule.
+
+### ABAC with governed tags
+
+Use ABAC when row/column security must scale across many tables:
+
+- Define governed tags at account level with controlled values.
+- Apply tags to catalogs, schemas, tables, columns, and volumes.
+- Attach ABAC policies high in the hierarchy so inheritance handles future objects.
+- Use governed tags for sensitivity, region, domain, retention, cost attribution, and access policy.
+
+Reject per-table copy/paste row filters and masks when a governed-tag ABAC policy would scale better.
+
+### Validation commands
+
+After configuring grants or FGAC, validate with:
+
+```sql
+SHOW GRANTS ON CATALOG finance_prod;
+SHOW GRANTS `analysts` ON SCHEMA finance_prod.sales;
+SHOW POLICIES ON CATALOG finance_prod;
+SHOW POLICIES ON SCHEMA finance_prod.sales;
+DESCRIBE TABLE EXTENDED finance_prod.sales.transactions;
+```
+
+Audit with `system.access.audit` for grant/revoke actions, data access events, policy changes, token creation, and admin role changes.
+
+---
+
 ## Secrets and connectivity
 
 - Use Databricks secret scopes (or external secret managers) for credentials.
@@ -199,9 +314,16 @@ Reject in review:
 ## Review checklist (quick)
 
 - [ ] Delta/UC choices are explicit (catalog/schema/table; grants)
+- [ ] Catalog topology maps to domain/environment/region requirements
+- [ ] Owners and MANAGE delegation use groups/service principals, not individuals
+- [ ] Privilege inheritance is intentional (`USE CATALOG` + `USE SCHEMA` + object privilege)
+- [ ] BROWSE / APPLY TAG / MANAGE are used as metadata-only capabilities where appropriate
 - [ ] Standard vs Dedicated access mode is intentional; no no-isolation shared compute
 - [ ] Workspace-only notebooks/files were exported into Git before refactor/deployment
 - [ ] Deployable jobs/pipelines are managed by Declarative Automation Bundles or Terraform
+- [ ] Storage credentials, external locations, managed locations, and volumes are explicit
+- [ ] External locations do not overlap
+- [ ] FGAC uses row filters / column masks / ABAC policies with validation queries
 - [ ] Idempotency and replay strategy is clear (upsert/dedupe/watermark)
 - [ ] No driver blowups (`collect/toPandas` on big data)
 - [ ] Joins and partitioning are intentional (pruning likely)

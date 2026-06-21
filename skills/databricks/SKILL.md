@@ -43,9 +43,11 @@ Use when the user is:
 ## Non-Negotiables
 
 - Production data uses Unity Catalog: three-part names, group/service-principal ownership, governed external locations or volumes.
+- Catalog topology maps to business domain, environment, region/data residency, and workspace binding requirements before production objects are created.
 - No persistent DBFS mounts (`dbfs:/mnt/...`) for governed production data.
 - No personal access tokens in production automation.
 - No `account users` grants, individual owners, or broad `ALL PRIVILEGES` grants without documented exception.
+- `BROWSE`, `APPLY TAG`, and `MANAGE` are metadata-only capabilities; do not confuse them with data access.
 - Standard access mode is the default. Dedicated access mode must state the technical reason.
 - Deployable jobs and Lakeflow pipelines use Declarative Automation Bundles with `databricks bundle validate` in CI.
 - Serverless SQL / jobs / Lakeflow are preferred where available and appropriate; classic clusters require a reason and a policy.
@@ -124,7 +126,135 @@ Migrate from Hive metastore (or no governance) to Unity Catalog.
 
 ---
 
-## Workflow 3 - Lakeflow Spark Declarative Pipelines (formerly DLT)
+## Workflow 3 - Catalog Topology and Delegated Ownership
+
+Translate organization structure into catalogs, schemas, workspaces, storage, and ownership.
+
+### Design dimensions
+
+1. **Metastore / region strategy**: one metastore per cloud-region; use Delta Sharing for cross-region/cross-cloud sharing.
+2. **Catalog boundary**: business unit, domain, environment, region, or shared data product.
+3. **Workspace binding**: which workspaces can see/use each catalog.
+4. **Storage boundary**: metastore, catalog, or schema managed location; external location for externally managed data.
+5. **Ownership and delegation**: group/service-principal owners, `MANAGE` delegation, data stewards.
+
+### Topology patterns
+
+| Pattern | Example | Use when |
+|---|---|---|
+| Direct separation | `finance_prod`, `finance_stage`, `finance_dev` | Environment isolation and workspace binding matter most |
+| Indirect separation | `finance` catalog with `prod_*`, `stage_*`, `dev_*` schemas | Fewer catalogs and team autonomy matter more |
+| Region + domain | `emea_finance_prod`, `apac_sales_prod` | Data residency or regional governance is a hard boundary |
+| Shared reference | `shared_reference_prod` | Cross-domain data products or common dimensions |
+
+### Ownership model
+
+- `OWNER`: full control, unique per object, can transfer ownership. Use groups/service principals in production.
+- `MANAGE`: can grant/revoke permissions without implicit data access or ownership transfer.
+- Delegation pattern:
+  1. Metastore admin grants `CREATE CATALOG` to catalog owner groups.
+  2. Catalog owner groups create catalogs and schemas.
+  3. Catalog/schema owners grant `MANAGE` to domain lead groups.
+  4. Data stewards get `APPLY TAG`; broad users may get `BROWSE` for discovery.
+
+**Deliverable:** topology decision record showing domain/env/region catalog names, workspace bindings, managed locations, owner groups, MANAGE delegates, and discovery/tagging groups.
+
+---
+
+## Workflow 4 - Storage Governance and External Access
+
+Design where data physically lives and how Unity Catalog mediates access.
+
+### Managed storage hierarchy
+
+Unity Catalog resolves managed storage from most specific to least specific:
+
+1. Schema managed location
+2. Catalog managed location
+3. Metastore default storage
+
+Use schema-level managed locations for regulated data requiring physical isolation. Use catalog-level locations for domain/environment boundaries. Keep metastore default storage as a fallback.
+
+### Tables vs volumes
+
+| Need | Use |
+|---|---|
+| Tabular data queried by SQL/Spark | Delta table (`catalog.schema.table`) |
+| Non-tabular files, PDFs, images, configs, ML artifacts | Unity Catalog volume (`/Volumes/catalog/schema/volume/...`) |
+| Existing cloud files where lifecycle remains outside Databricks | External table or external volume |
+| Legacy/external database without immediate copy | Foreign catalog / Lakehouse Federation |
+
+### External access chain
+
+For external data, require the full chain:
+
+1. Storage credential - cloud identity Unity Catalog can use.
+2. External location - non-overlapping cloud path bound to the credential.
+3. External table/volume - governed object using the external location.
+
+Reject overlapping external locations, raw cloud credentials in notebooks, and direct cloud paths where UC volumes/external locations should be used.
+
+**Deliverable:** storage map showing managed locations, storage credentials, external locations, volumes, foreign catalogs, owners, and allowed write paths.
+
+---
+
+## Workflow 5 - Privileges, Discovery, FGAC, and ABAC
+
+Implement least privilege and scalable fine-grained access.
+
+### Privilege chain
+
+To query a table, users need:
+
+1. `USE CATALOG`
+2. `USE SCHEMA`
+3. `SELECT` on the table/view
+
+Higher-level grants inherit downward. Grant at the highest safe scope; avoid per-table grants unless the table is exceptional.
+
+### Metadata-only privileges
+
+- `BROWSE`: discover objects and metadata without reading data.
+- `APPLY TAG`: classify assets without data access.
+- `MANAGE`: delegate permission administration without ownership or implicit data access.
+
+### FGAC choices
+
+| Pattern | Use when |
+|---|---|
+| Row filter | Rows visible depend on user/group/context |
+| Column mask | Sensitive columns need redaction/transformation |
+| ABAC governed-tag policy | Same row/mask logic applies across many tables/columns |
+| Dynamic view | Legacy/special-case logic not expressible as table-attached policy |
+
+Prefer ABAC for enterprise scale: governed tags + inheritable policies beat per-table copy/paste filters and masks.
+
+### Validation
+
+Always validate outcomes:
+
+```sql
+SHOW GRANTS ON CATALOG finance_prod;
+SHOW GRANTS `analysts` ON SCHEMA finance_prod.sales;
+SHOW POLICIES ON CATALOG finance_prod;
+SHOW POLICIES ON SCHEMA finance_prod.sales;
+DESCRIBE TABLE EXTENDED finance_prod.sales.transactions;
+```
+
+Audit signals:
+
+- grant/revoke actions
+- ownership transfers
+- policy and tag changes
+- token creation
+- admin role changes
+- denied/failed access attempts
+
+**Deliverable:** grants/policies matrix plus validation query outputs and system-table audit queries.
+
+---
+
+## Workflow 6 - Lakeflow Spark Declarative Pipelines (formerly DLT)
 
 Lakeflow Spark Declarative Pipelines for declarative, managed, observable pipelines. Existing DLT syntax still works; new Python should prefer `from pyspark import pipelines as dp`.
 
@@ -186,7 +316,7 @@ DLT compatibility mapping:
 
 ---
 
-## Workflow 4 - Cluster Policies
+## Workflow 7 - Cluster Policies
 
 Enforce cost, security, and compatibility at cluster-creation time.
 
@@ -230,7 +360,7 @@ Then grant `CAN_USE` to the right group.
 
 ---
 
-## Workflow 5 - Cost and Performance Tuning
+## Workflow 8 - Cost and Performance Tuning
 
 ### Levers (ordered by impact)
 
@@ -258,11 +388,11 @@ Then grant `CAN_USE` to the right group.
 
 ---
 
-## Workflow 6 - Governance Audit
+## Workflow 9 - Governance Audit
 
 ### Steps
 
-1. **Catalog inventory**: catalogs, schemas, tables, volumes, functions. Owner + tags per table.
+1. **Catalog inventory**: catalogs, schemas, tables, volumes, functions, models, and foreign catalogs. Owner + tags per object.
 2. **Access grants**: pull from `information_schema.*` and Unity Catalog grants. Flag:
    - Grants to `account users` (broad)
    - `ALL PRIVILEGES` at catalog / schema level
@@ -287,7 +417,7 @@ Then grant `CAN_USE` to the right group.
    - Streamed to SIEM; retention per policy
    - Alerts on privilege changes, admin role grants, token creation
 
-## Workflow 7 - Export Workspace Assets into Git
+## Workflow 10 - Export Workspace Assets into Git
 
 Use when notebooks/files/workspace assets exist only in the Databricks workspace and are not yet in a Git folder or repo. Export first, then refactor.
 
@@ -340,7 +470,7 @@ Use when notebooks/files/workspace assets exist only in the Databricks workspace
 
 ---
 
-## Workflow 8 - Declarative Automation Bundles CI/CD
+## Workflow 11 - Declarative Automation Bundles CI/CD
 
 Use Declarative Automation Bundles (formerly Databricks Asset Bundles) for deployable Databricks projects.
 
@@ -361,7 +491,7 @@ databricks bundle run smoke-tests --target staging
 
 Authentication for CI uses workload identity / OIDC or service principals. Do not use user PATs.
 
-## Workflow 9 - AI / ML / Model Governance
+## Workflow 12 - AI / ML / Model Governance
 
 For ML and AI workloads:
 
@@ -373,7 +503,7 @@ For ML and AI workloads:
 
 ---
 
-## Workflow 10 - Recovery via Delta Time Travel
+## Workflow 13 - Recovery via Delta Time Travel
 
 Delta tables preserve history; `RESTORE` brings you back.
 
