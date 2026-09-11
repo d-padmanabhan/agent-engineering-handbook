@@ -1,0 +1,359 @@
+{
+  "skill_name": "kubernetes-operator-development",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review a controller that creates a billing account in an external SaaS API. It first calls GET by display name, then POST if absent. Each Reconcile generates a new request ID. The provider can create duplicate display names, and a successful POST can time out before the response reaches the controller. Give the smallest safe design correction.",
+      "expected_output": "Observe-before-create is not race-safe. Derive one stable idempotency key from the Kubernetes UID and immutable operation intent and reuse it across retries and restarts. Prefer provider idempotency or atomic conditional create, then after an unknown timeout observe by stable provider identity and verify ownership metadata before retrying. Do not generate a new key per Reconcile or accept a display-name match as ownership.",
+      "files": [],
+      "checks": [
+        {
+          "id": "rejects-observe-only-idempotency",
+          "type": "contains_all",
+          "values": [
+            "not race-safe",
+            "stable idempotency key"
+          ]
+        },
+        {
+          "id": "binds-stable-operation-identity",
+          "type": "contains_all",
+          "values": [
+            "Kubernetes UID",
+            "immutable operation intent",
+            "retries",
+            "restarts"
+          ]
+        },
+        {
+          "id": "recovers-lost-response",
+          "type": "contains_all",
+          "values": [
+            "unknown timeout",
+            "observe",
+            "verify ownership"
+          ]
+        },
+        {
+          "id": "rejects-new-attempt-key",
+          "type": "contains_all",
+          "values": [
+            "Do not",
+            "new key per Reconcile",
+            "display-name"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Two clusters each have team-a/SharedDatabase named payroll. The operator finds an existing provider database called payroll and its status contains that provider ID, so it plans to adopt and manage it. Review the ownership design.",
+      "expected_output": "Reject adoption based on name or status ID. Require an explicit authorized adoption policy, unique provider identity, conflict check, and provider-side ownership metadata that includes controller identity, cluster identity, namespace, name, and Kubernetes UID. A recreated CR has a new UID and must not gain destructive authority over the old database. If the provider cannot store metadata, use a durable ownership registry with uniqueness constraints.",
+      "files": [],
+      "checks": [
+        {
+          "id": "rejects-name-and-status-ownership",
+          "type": "contains_all",
+          "values": [
+            "Reject",
+            "name",
+            "status ID"
+          ]
+        },
+        {
+          "id": "requires-authorized-adoption",
+          "type": "contains_all",
+          "values": [
+            "explicit",
+            "authorized",
+            "adoption",
+            "conflict check"
+          ]
+        },
+        {
+          "id": "binds-full-owner-identity",
+          "type": "contains_all",
+          "values": [
+            "cluster identity",
+            "namespace",
+            "Kubernetes UID"
+          ]
+        },
+        {
+          "id": "handles-metadata-gap",
+          "type": "contains_all",
+          "values": [
+            "durable ownership registry",
+            "uniqueness"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Design deletion for a production ObjectBucket CR. The proposal defaults deletionPolicy to Delete, lets any namespace editor change it, deletes by bucket name, and leaves failed finalizers blocked forever without a runbook. Provide the required corrections.",
+      "expected_output": "Use a conservative Retain default for durable data. Treat changing to Delete as an authorization-sensitive destructive action. Before deletion, fetch by immutable provider identity and verify Kubernetes UID ownership metadata; never delete by bucket name alone. Register the finalizer before external creation, make cleanup idempotent, and treat provider NotFound as success. Expose finalizer age and failure, define bounded retries plus a manual unblock runbook, and provide orphan discovery and repair because finalizers do not guarantee cleanup.",
+      "files": [],
+      "checks": [
+        {
+          "id": "uses-conservative-deletion",
+          "type": "contains_all",
+          "values": [
+            "Retain",
+            "authorization-sensitive",
+            "destructive"
+          ]
+        },
+        {
+          "id": "verifies-delete-ownership",
+          "type": "contains_all",
+          "values": [
+            "immutable provider identity",
+            "Kubernetes UID",
+            "never delete by bucket name"
+          ]
+        },
+        {
+          "id": "orders-and-idempotently-cleans",
+          "type": "contains_all",
+          "values": [
+            "finalizer before external creation",
+            "idempotent",
+            "NotFound"
+          ]
+        },
+        {
+          "id": "defines-stuck-finalizer-recovery",
+          "type": "contains_all",
+          "values": [
+            "manual unblock runbook",
+            "orphan discovery",
+            "do not guarantee cleanup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "A controller writes a child Deployment and immediately reads it through the default controller-runtime client. The cached read returns NotFound. The proposed fix sleeps for two seconds and disables caching for every type. Explain the correct handling.",
+      "expected_output": "The default client normally writes directly to the API server and reads from an informer cache, so read-after-write can be stale. Make reconciliation tolerate cache lag, return after the write, and continue from a later event or bounded requeue. Use resource versions and narrow patches for conflicts. Use APIReader only for a specific documented strong-read requirement. Do not sleep for cache propagation or broadly disable caching.",
+      "files": [],
+      "checks": [
+        {
+          "id": "explains-cache-semantics",
+          "type": "contains_all",
+          "values": [
+            "writes directly",
+            "informer cache",
+            "stale"
+          ]
+        },
+        {
+          "id": "designs-for-convergence",
+          "type": "contains_all",
+          "values": [
+            "tolerate cache lag",
+            "return after the write",
+            "bounded requeue"
+          ]
+        },
+        {
+          "id": "narrows-live-reads",
+          "type": "contains_all",
+          "values": [
+            "APIReader",
+            "specific",
+            "strong-read"
+          ]
+        },
+        {
+          "id": "rejects-sleep-and-global-bypass",
+          "type": "contains_all",
+          "values": [
+            "Do not sleep",
+            "broadly disable caching"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "A provider returns Retry-After: 90 seconds. The HTTP transport retries three times, the SDK retries five times, and Reconcile returns the final error. MaxConcurrentReconciles is 100 with no tenant limit. Review the retry and scale design.",
+      "expected_output": "Choose one retry owner for each failure path so HTTP, SDK, and workqueue retries do not multiply. Honor a bounded Retry-After with jitter and a total context deadline, propagate cancellation, and cap attempts. Set MaxConcurrentReconciles from measured quota and latency. Add shared provider rate limiting and per-tenant fairness so one tenant cannot consume the whole budget; monitor queue, throttle, retry, and latency metrics.",
+      "files": [],
+      "checks": [
+        {
+          "id": "prevents-retry-multiplication",
+          "type": "contains_all",
+          "values": [
+            "one retry owner",
+            "do not multiply"
+          ]
+        },
+        {
+          "id": "bounds-provider-delay",
+          "type": "contains_all",
+          "values": [
+            "bounded Retry-After",
+            "jitter",
+            "context deadline",
+            "cancellation"
+          ]
+        },
+        {
+          "id": "sizes-concurrency-from-evidence",
+          "type": "contains_all",
+          "values": [
+            "MaxConcurrentReconciles",
+            "measured quota",
+            "latency"
+          ]
+        },
+        {
+          "id": "isolates-tenants",
+          "type": "contains_all",
+          "values": [
+            "shared provider rate limiting",
+            "per-tenant fairness"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Plan a CRD upgrade from v1alpha1 to v1. The team wants to mark v1 as storage, delete the alpha schema and conversion code in the same rollout, and rely on generated code compiling. State the safe upgrade contract.",
+      "expected_output": "Keep old served versions until clients migrate and stored objects are rewritten. Define one storage version and a conversion path that round-trips supported fields without semantic loss. Roll out and verify the conversion webhook and certificates before CRD changes. Test old stored objects, changed defaults, storage-version migration, and both forward upgrade and rollback with the previous operator. Compilation alone is insufficient, and removing v1alpha1 in the same rollout is unsafe.",
+      "files": [],
+      "checks": [
+        {
+          "id": "preserves-served-version",
+          "type": "contains_all",
+          "values": [
+            "old served versions",
+            "clients migrate",
+            "stored objects"
+          ]
+        },
+        {
+          "id": "requires-roundtrip-conversion",
+          "type": "contains_all",
+          "values": [
+            "one storage version",
+            "round-trips",
+            "without semantic loss"
+          ]
+        },
+        {
+          "id": "orders-webhook-rollout",
+          "type": "contains_all",
+          "values": [
+            "conversion webhook",
+            "certificates",
+            "before CRD"
+          ]
+        },
+        {
+          "id": "tests-upgrade-and-rollback",
+          "type": "contains_all",
+          "values": [
+            "changed defaults",
+            "storage-version migration",
+            "rollback",
+            "Compilation alone is insufficient"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "A controller test uses only the controller-runtime fake client and envtest. It asserts that OpenAPI defaults, admission, owner-reference garbage collection, scheduling, and kubelet behavior all work in production. Review the evidence and give the smallest test correction.",
+      "expected_output": "The fake client does not prove API-server defaulting, validation, admission, conversion, cache lag, or managed fields. Use envtest for API-server schema, status subresource, finalizer, webhook, watch, index, and conflict behavior. Envtest does not run the full control plane, including built-in garbage collection, scheduling, or kubelet behavior. Add explicit substitutes or isolated real-cluster tests for those claims.",
+      "files": [],
+      "checks": [
+        {
+          "id": "rejects-fake-api-proof",
+          "type": "contains_all",
+          "values": [
+            "fake client does not prove",
+            "defaulting",
+            "admission",
+            "cache lag"
+          ]
+        },
+        {
+          "id": "scopes-envtest-use",
+          "type": "contains_all",
+          "values": [
+            "envtest",
+            "status subresource",
+            "webhook",
+            "conflict"
+          ]
+        },
+        {
+          "id": "identifies-envtest-gap",
+          "type": "contains_all",
+          "values": [
+            "does not run the full control plane",
+            "garbage collection",
+            "scheduling",
+            "kubelet"
+          ]
+        },
+        {
+          "id": "requires-realistic-substitute",
+          "type": "contains_all",
+          "values": [
+            "explicit substitutes",
+            "real-cluster tests"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "A CR reports Ready=True from generation 4 while metadata.generation is 7. The controller uses only GenerationChangedPredicate and an invalid credential Secret was later repaired. A client treats the resource as ready. Review status and recovery behavior.",
+      "expected_output": "Ready=True is stale because its observedGeneration does not match metadata.generation. Set conditions with metav1.Condition and a current observed generation, stable reason, and safe message. The Secret change does not increment the CR generation, so a generation-only predicate can suppress recovery. Watch the referenced Secret with an index and mapping function, and use a bounded drift requeue only as a safety net.",
+      "files": [],
+      "checks": [
+        {
+          "id": "rejects-stale-readiness",
+          "type": "contains_all",
+          "values": [
+            "Ready=True is stale",
+            "observedGeneration",
+            "metadata.generation"
+          ]
+        },
+        {
+          "id": "uses-standard-condition",
+          "type": "contains_all",
+          "values": [
+            "metav1.Condition",
+            "stable reason",
+            "safe message"
+          ]
+        },
+        {
+          "id": "rejects-generation-only-recovery",
+          "type": "contains_all",
+          "values": [
+            "Secret change",
+            "generation-only predicate",
+            "suppress recovery"
+          ]
+        },
+        {
+          "id": "watches-referenced-secret",
+          "type": "contains_all",
+          "values": [
+            "Watch",
+            "referenced Secret",
+            "index",
+            "mapping function"
+          ]
+        }
+      ]
+    }
+  ]
+}

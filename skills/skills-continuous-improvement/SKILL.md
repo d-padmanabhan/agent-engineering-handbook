@@ -45,7 +45,7 @@ Prioritize skills with paired rules first:
 - JavaScript and TypeScript rule (`${HANDBOOK_ROOT}/rules/225-javascript-typescript.mdc`) ↔ TypeScript/JavaScript skill (`${HANDBOOK_ROOT}/skills/typescript-javascript/SKILL.md`)
 - Bash rule (`${HANDBOOK_ROOT}/rules/140-bash.mdc`) ↔ Bash skill (`${HANDBOOK_ROOT}/skills/bash-shell-scripting/SKILL.md`) and scripting automation skill (`${HANDBOOK_ROOT}/skills/scripting-automation/SKILL.md`)
 - Cloudflare rule (`${HANDBOOK_ROOT}/rules/400-cloudflare.mdc`) / Cloudflare Workers rule (`${HANDBOOK_ROOT}/rules/401-cloudflare-workers.mdc`) / Cloudflare WAF rule (`${HANDBOOK_ROOT}/rules/405-cloudflare-waf-rules.mdc`) ↔ Cloudflare skills
-- Kubernetes rule (`${HANDBOOK_ROOT}/rules/450-kubernetes.mdc`) / Helm rule (`${HANDBOOK_ROOT}/rules/460-helm.mdc`) ↔ Kubernetes containers skill (`${HANDBOOK_ROOT}/skills/kubernetes-containers/SKILL.md`)
+- Kubernetes rule (`${HANDBOOK_ROOT}/rules/450-kubernetes.mdc`) / Helm rule (`${HANDBOOK_ROOT}/rules/460-helm.mdc`) ↔ Kubernetes containers skill (`${HANDBOOK_ROOT}/skills/kubernetes-containers/SKILL.md`) and Kubernetes operator development skill (`${HANDBOOK_ROOT}/skills/kubernetes-operator-development/SKILL.md`)
 
 ## Review Workflow
 

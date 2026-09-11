@@ -38,6 +38,7 @@ ROUTING_FILES: tuple[Path, ...] = (
     REPOSITORY_ROOT / "skills" / "git-workflow" / "SKILL.md",
     REPOSITORY_ROOT / "skills" / "containers-orchestration" / "SKILL.md",
     REPOSITORY_ROOT / "skills" / "kubernetes-containers" / "SKILL.md",
+    REPOSITORY_ROOT / "skills" / "kubernetes-operator-development" / "SKILL.md",
     REPOSITORY_ROOT / "skills" / "bash-shell-scripting" / "SKILL.md",
     REPOSITORY_ROOT / "skills" / "python-development" / "SKILL.md",
     REPOSITORY_ROOT / "skills" / "typescript-javascript" / "SKILL.md",
@@ -95,6 +96,18 @@ class RuleOwnershipTests(unittest.TestCase):
             with self.subTest(heading=removed_heading):
                 self.assertNotIn(removed_heading, docker_rule)
 
+    def test_kubernetes_rule_routes_operator_workflows(self) -> None:
+        kubernetes_rule = (REPOSITORY_ROOT / "rules" / "450-kubernetes.mdc").read_text(encoding="utf-8")
+        kubernetes_skill = (REPOSITORY_ROOT / "skills" / "kubernetes-containers" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        operator_reference = "${HANDBOOK_ROOT}/skills/kubernetes-operator-development/SKILL.md"
+
+        self.assertIn(operator_reference, kubernetes_rule)
+        self.assertIn(operator_reference, kubernetes_skill)
+        self.assertIn("observe-before-create alone is not race-safe", kubernetes_rule)
+        self.assertIn("Status identifiers alone are not ownership proof", kubernetes_rule)
+
     def test_documentation_rule_routes_workflows_without_stale_tutorials(self) -> None:
         documentation_rule = (REPOSITORY_ROOT / "rules" / "810-documentation.mdc").read_text(encoding="utf-8")
 
@@ -111,6 +124,20 @@ class RuleOwnershipTests(unittest.TestCase):
         ):
             with self.subTest(content=stale_content):
                 self.assertNotIn(stale_content, documentation_rule)
+
+    def test_github_actions_uses_exact_latest_release_tags(self) -> None:
+        github_actions_rule = (REPOSITORY_ROOT / "rules" / "160-github-actions.mdc").read_text(encoding="utf-8")
+        github_actions_skill = (REPOSITORY_ROOT / "skills" / "cicd-github-actions" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+
+        for content in (github_actions_rule, github_actions_skill):
+            with self.subTest(source=content[:40]):
+                self.assertIn("releases/latest\" --jq '.tag_name'", content)
+                self.assertIn("latest stable release tag", content)
+                self.assertNotIn("latest_sha=", content)
+                self.assertNotIn("SHA-pinned repository", content)
+                self.assertNotIn("Preserve SHA posture", content)
 
     def test_workflow_publishes_stable_handbook_root(self) -> None:
         workflow_rule: str = (REPOSITORY_ROOT / "rules" / "010-workflow.mdc").read_text(encoding="utf-8")

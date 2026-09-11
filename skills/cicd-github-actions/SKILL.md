@@ -193,27 +193,23 @@ jobs:
 
 ## Action-Version Audit
 
-Before changing workflow logic, audit every `uses:` reference. Verify the exact release and ref; never derive `vN` from `vN.x.y` and assume the moving major tag exists.
+Before changing workflow logic, audit every `uses:` reference. Query the latest stable GitHub release and use its exact release tag; do not derive a moving-major alias or resolve the release tag to a commit SHA.
 
 ```bash
 action="OWNER/REPO"
 latest_tag="$(gh api "repos/${action}/releases/latest" --jq '.tag_name')"
-latest_sha="$(gh api "repos/${action}/commits/${latest_tag}" --jq '.sha')"
-printf "tag=%s sha=%s\n" "${latest_tag}" "${latest_sha}"
+printf 'uses: %s@%s\n' "${action}" "${latest_tag}"
 ```
 
 Decision matrix per finding:
 
 | Pin state | Action |
 |---|---|
-| SHA-pinned `@<40-character-sha>` | Preserve SHA posture; use the verified release commit and add `# vN.x.y` |
-| Exact release tag | Use the verified latest stable tag after compatibility review |
-| Moving major tag | Verify `git/ref/tags/vN` exists before use |
-| `@main`, `@master`, `@latest`, unpinned, or invented alias | Replace with a verified ref |
-| Archived, missing, or prerelease-only | Stop and report; do not silently downgrade or replace |
-| Frozen pin | Retain and report the available update |
+| Exact latest stable release tag | Retain after compatibility review |
+| SHA, moving major, older exact tag, `@main`, `@master`, `@latest`, unpinned, or invented alias | Replace with the verified latest stable release tag |
+| Archived, missing, prerelease-only, or no verifiable stable GitHub release | Stop and report; do not silently downgrade or replace |
 
-Read release notes, preserve independently revertible upgrades, run `actionlint`, and let Dependabot or Renovate propose future updates. Follow the GitHub Actions rule (`${HANDBOOK_ROOT}/rules/160-github-actions.mdc`) and dependency currency workflow (`${HANDBOOK_ROOT}/skills/core-engineering/references/dependency-and-toolchain-currency.md`).
+Release tags are mutable Git references. Restrict workflows to reviewed actions, read release provenance and notes, preserve independently revertible upgrades, run `actionlint`, and let Dependabot or Renovate propose future updates. Follow the GitHub Actions rule (`${HANDBOOK_ROOT}/rules/160-github-actions.mdc`) and dependency currency workflow (`${HANDBOOK_ROOT}/skills/core-engineering/references/dependency-and-toolchain-currency.md`).
 
 ## Detailed References
 

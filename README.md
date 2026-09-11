@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 
-This repository contains 52 Cursor rule files, 53 Agent Skills, 19 custom Cursor commands, and 31 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
+This repository contains 52 Cursor rule files, 54 Agent Skills, 19 custom Cursor commands, and 32 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
 
 The content is organized for progressive disclosure:
 
@@ -367,7 +367,7 @@ The repository currently contains 52 `.mdc` rule files. The following list highl
 
 ## Skill Catalog
 
-The repository currently contains 53 skill packages. Each directory listed below contains a `SKILL.md`.
+The repository currently contains 54 skill packages. Each directory listed below contains a `SKILL.md`.
 
 ### Engineering and Languages
 
@@ -411,6 +411,7 @@ The repository currently contains 53 skill packages. Each directory listed below
 - [Durable Objects](skills/durable-objects/)
 - [Infrastructure as Code](skills/infrastructure-iac/)
 - [Kubernetes and containers](skills/kubernetes-containers/)
+- [Kubernetes operator development](skills/kubernetes-operator-development/)
 - [Sandbox SDK](skills/sandbox-sdk/)
 - [Workers best practices](skills/workers-best-practices/)
 - [Wrangler](skills/wrangler/)
@@ -445,7 +446,7 @@ The repository currently contains 53 skill packages. Each directory listed below
 
 ## Skill Evaluation
 
-The dependency-free [Agent Skills eval harness](evals/) validates all skill metadata and the 31 available behavioral suites. Model-backed comparisons use an external command adapter; pull-request CI runs deterministic validation and unit tests without model credentials.
+The dependency-free [Agent Skills eval harness](evals/) validates all skill metadata and the 32 available behavioral suites. Model-backed comparisons use an external command adapter; pull-request CI runs deterministic validation and unit tests without model credentials.
 
 Current behavioral suites:
 
@@ -468,6 +469,7 @@ Current behavioral suites:
 - [IAM security advisor](skills/iam-security-advisor/evals/evals.json)
 - [Independent verification](skills/independent-verification/evals/evals.json)
 - [Kubernetes and containers](skills/kubernetes-containers/evals/evals.json)
+- [Kubernetes operator development](skills/kubernetes-operator-development/evals/evals.json)
 - [Memory architecture](skills/memory-architecture/evals/evals.json)
 - [Networking and transport](skills/networking-transport/evals/evals.json)
 - [Observability](skills/observability/evals/evals.json)

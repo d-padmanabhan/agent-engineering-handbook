@@ -10,13 +10,14 @@ globs:
   - "**/deployments/**/*.{yaml,yml,json}"
   - "**/kustomization.{yaml,yml}"
   - "**/*-crd.{yaml,yml}"
+  - "**/*_types.go"
   - "**/*_controller.go"
   - "**/*_webhook.go"
 ---
 
 # Kubernetes Engineering Gates
 
-This rule owns mandatory policy only. Use the Kubernetes containers skill (`${HANDBOOK_ROOT}/skills/kubernetes-containers/SKILL.md`) for procedures, examples, troubleshooting, Helm, EKS, Podtrace, and Argo CD workflows.
+This rule owns mandatory policy only. Use the Kubernetes containers skill (`${HANDBOOK_ROOT}/skills/kubernetes-containers/SKILL.md`) for workloads, troubleshooting, Helm, EKS, Podtrace, and Argo CD. Use the Kubernetes operator development skill (`${HANDBOOK_ROOT}/skills/kubernetes-operator-development/SKILL.md`) for CRD, controller, webhook, provider, lifecycle, and operator testing workflows.
 
 ## Workload Security
 
@@ -37,10 +38,13 @@ This rule owns mandatory policy only. Use the Kubernetes containers skill (`${HA
 ## Controllers and API Concurrency
 
 - Reconcile desired state idempotently and use context-aware clients with bounded timeouts.
+- Provider mutations require stable operation identity or atomic preconditions; observe-before-create alone is not race-safe.
+- Verify immutable external identity and ownership before adoption, update, or deletion. Status identifiers alone are not ownership proof.
+- Treat controller-runtime cached reads as potentially stale. Design for convergence after writes and use uncached reads only for a narrow, documented correctness requirement.
 - For an expected stale `resourceVersion` conflict, re-read current state and use a bounded retry or requeue. Do not retry blindly.
 - Repeated conflicts require diagnosis of field ownership, update scope, and competing reconcilers; prefer narrow patches or Server-Side Apply with an explicit field manager where appropriate.
 - Emit metrics for conflict rate, reconcile errors, retries, and latency. Persistent conflict is an operational defect even when bounded retries succeed.
-- CRD schema, status conditions, finalizers, conversion, defaulting, and deletion behavior must be documented and tested before release.
+- CRD schema, status conditions, finalizers, conversion, defaulting, adoption, orphan recovery, and deletion behavior must be documented and tested before release.
 
 ## Mutation and Verification
 

@@ -17,7 +17,7 @@ The harness does not treat answer similarity, self-report, or reading `SKILL.md`
 
 ## Coverage
 
-The harness currently discovers 31 behavioral suites across 53 skills. The [root README](../README.md#skill-evaluation) contains the authoritative suite inventory.
+The harness currently discovers 32 behavioral suites across 54 skills. The [root README](../README.md#skill-evaluation) contains the authoritative suite inventory.
 
 Coverage is intentionally risk-driven rather than uniform. Current suites emphasize security boundaries, identity, API and data contracts, infrastructure behavior, runtime correctness, reliability, and documentation artifacts. Skills without suites still receive metadata and schema validation.
 

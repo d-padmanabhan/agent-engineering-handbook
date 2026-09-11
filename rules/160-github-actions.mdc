@@ -135,30 +135,22 @@ jobs:
   - a header comment at the top of the YAML
   - repo docs like `GHA-RULESET.md` or `README.md`
 
-- Pin every action to a verified Git ref. Never derive `vN` from a release such as `v10.0.1` and assume the moving `v10` tag exists.
-- Preserve repository policy: immutable SHA pins stay SHA-pinned; exact-tag or verified-major repositories retain that posture unless the task explicitly changes it.
+- Pin every action to its verified latest stable release tag. Use the exact release tag, not a derived moving-major alias or resolved commit SHA.
 - Never use `@main`, `@master`, `@latest`, an unverified alias, or an invented tag.
 
 **For AI Agents Authoring or Reviewing Workflows:**
 
-For every action in a changed workflow, query the latest stable release tag and resolve it to a concrete commit:
+For every action in a changed workflow, query and use the latest stable release tag:
 
 ```bash
 action="OWNER/REPO"
 latest_tag="$(gh api "repos/${action}/releases/latest" --jq '.tag_name')"
-latest_sha="$(gh api "repos/${action}/commits/${latest_tag}" --jq '.sha')"
-printf "tag=%s sha=%s\n" "${latest_tag}" "${latest_sha}"
+printf 'uses: %s@%s\n' "${action}" "${latest_tag}"
 ```
 
-Then choose a ref that actually exists:
+Use `OWNER/REPO@<latest-release-tag>` exactly as returned by the API. Do not replace it with a moving major tag or resolve it to a commit SHA. If the action is archived, missing, prerelease-only, or has no verifiable stable GitHub release, stop and report it; do not invent, downgrade, or replace the ref silently.
 
-1. **SHA-pinned repository:** use `OWNER/REPO@<40-character-commit-sha> # <release-tag>`.
-2. **Exact-tag repository:** use the verified release tag returned by the API.
-3. **Moving-major repository:** query `repos/OWNER/REPO/git/ref/tags/vN` first; use `@vN` only when that exact tag exists and repository policy permits moving tags.
-4. **Archived, missing, prerelease-only, or unverifiable action:** stop and report it; do not invent, downgrade, or replace the ref silently.
-5. **Frozen pin:** retain it and report the newer release.
-
-Review release notes for breaking changes, run `actionlint`, execute repository checks, and keep upgrades independently revertible. Dependabot or Renovate should propose future updates.
+Release tags are mutable Git references. Restrict workflows to reviewed actions, review release provenance and notes, run `actionlint`, execute repository checks, and keep upgrades independently revertible. Dependabot or Renovate should propose future updates.
 
 - Review [https://docs.github.com/en/actions](https://docs.github.com/en/actions) and adopt relevant best practices
 

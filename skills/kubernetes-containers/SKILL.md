@@ -239,6 +239,10 @@ Exceptions are narrow: CNI / CSI components, eBPF observability, runtime securit
 
 The mandatory authorization, preview, automation, and recovery gates live in the Kubernetes rule (`${HANDBOOK_ROOT}/rules/450-kubernetes.mdc#argo-cd-synchronization`). Follow the Argo CD synchronization runbook (`${HANDBOOK_ROOT}/skills/kubernetes-containers/references/argocd-sync.md`) for read-only preflight, approval evidence, exact-revision sync, bounded verification, and Git-based recovery.
 
+## Kubernetes Operators
+
+Use the Kubernetes operator development skill (`${HANDBOOK_ROOT}/skills/kubernetes-operator-development/SKILL.md`) for CRD API design, reconciliation, status conditions, finalizers, admission and conversion webhooks, external-provider ownership, controller-runtime cache behavior, and operator testing. Keep this skill focused on workload, packaging, GitOps, and cluster operations.
+
 ## Helm Quick Reference
 
 ```bash
