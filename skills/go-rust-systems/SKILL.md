@@ -227,10 +227,10 @@ use thiserror::Error;
 pub enum AppError {
     #[error("User not found: {0}")]
     NotFound(String),
-    
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
-    
+
     #[error("Invalid input: {0}")]
     Validation(String),
 }
@@ -251,6 +251,13 @@ fn process_user(id: &str) -> anyhow::Result<User> {
 opts := &slog.HandlerOptions{AddSource: true, Level: slog.LevelInfo}
 slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, opts)))
 ```
+
+`slog.NewJSONHandler` emits one JSON object per physical line, which is suitable
+for NDJSON container streams. Do not require NDJSON when structured events are
+exported through OTLP, journald, or another native transport. Follow the
+observability skill
+(`${HANDBOOK_ROOT}/skills/observability/SKILL.md`) for collection, buffering,
+redaction, rotation, and loss behavior.
 
 ### Calling conventions, ordered by safety
 
