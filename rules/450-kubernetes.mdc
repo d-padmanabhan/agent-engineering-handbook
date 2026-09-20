@@ -33,6 +33,7 @@ This rule owns mandatory policy only. Use the Kubernetes containers skill (`${HA
 - Selectors, labels, ports, namespaces, and ownership boundaries MUST agree across workloads, Services, policies, autoscalers, and disruption budgets.
 - Stateful resources require an explicit persistence, backup, restore, retention, and deletion policy.
 - NetworkPolicy must default-deny where the platform supports it, then allow only required ingress and egress.
+- Tolerations permit placement but do not select nodes. Use trusted node affinity for dedicated pools, and require hard affinity, anti-affinity, or topology-spread constraints to be feasible under minimum and degraded cluster capacity.
 - Changes to shared cluster-scoped resources require ownership review before application.
 
 ## Controllers and API Concurrency

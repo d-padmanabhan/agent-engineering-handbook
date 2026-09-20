@@ -126,6 +126,60 @@
           ]
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Prepare my current task for commit. Before this task, the worktree already contained modified billing.go and an untracked migration.sql from another agent session. My task changes api.go. A task-scoped pre-commit hook reformats api.go, and an authorized tool upgrade updates tool.toml and tool.lock. A teammate suggests git add -A so nothing is missed. Explain exactly what belongs in the commit.",
+      "expected_output": "Preserve the pre-task baseline and treat billing.go and migration.sql as owned by another session: do not edit or stage them. Reject git add -A and stage explicit task paths. Include the reviewed api.go hook formatting plus tool.toml and tool.lock because they were directly caused by the task-scoped hook or authorized upgrade and are required for this commit. Inspect the induced diff, rerun applicable verification, mention material hook or upgrade effects in the commit message, and preview the exact staged file list before confirmation.",
+      "files": [],
+      "checks": [
+        {
+          "id": "preserves-concurrent-session-work",
+          "type": "contains_all",
+          "values": [
+            "billing.go",
+            "migration.sql",
+            "another session",
+            "do not edit or stage"
+          ]
+        },
+        {
+          "id": "rejects-broad-staging",
+          "type": "contains_all",
+          "values": [
+            "Reject git add -A",
+            "explicit task paths"
+          ]
+        },
+        {
+          "id": "includes-induced-task-changes",
+          "type": "contains_all",
+          "values": [
+            "api.go",
+            "tool.toml",
+            "tool.lock",
+            "authorized upgrade",
+            "required for this commit"
+          ]
+        },
+        {
+          "id": "reviews-and-reverifies-induced-diff",
+          "type": "contains_all",
+          "values": [
+            "Inspect the induced diff",
+            "rerun applicable verification",
+            "commit message"
+          ]
+        },
+        {
+          "id": "previews-exact-staged-scope",
+          "type": "contains_all",
+          "values": [
+            "exact staged file list",
+            "confirmation"
+          ]
+        }
+      ]
     }
   ]
 }

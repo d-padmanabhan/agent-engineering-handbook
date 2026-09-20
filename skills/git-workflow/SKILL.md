@@ -50,7 +50,18 @@ Do not use `git switch -c` in a dirty worktree: compatible uncommitted changes c
 
 ### Prepare a commit
 
-Inspect status, staged and unstaged changes, and recent message style. Stage only the approved files. Use the format and review gate in git-workflow.md (`${HANDBOOK_ROOT}/skills/git-workflow/git-workflow.md`).
+Inspect status, staged and unstaged changes, and recent message style. Record the pre-task path baseline and treat every unrelated path as potentially owned by another user or agent session.
+
+Stage explicit task paths, never the whole worktree by default. Avoid broad commands such as `git add -A`, `git add .`, or `git commit -a` when unrelated changes exist.
+
+Run required hooks and generation after staging the intended change. Then compare status and the staged diff with the baseline:
+
+- Include formatting, generated files, manifests, lockfiles, or configuration changes produced directly by task-scoped pre-commit hooks or an authorized dependency/tool upgrade when they are required for the commit.
+- Review those induced changes, rerun applicable verification, and describe material hook or upgrade effects in the commit message.
+- Leave all pre-existing and concurrently created unrelated files untouched and unstaged. A hook modifying unrelated paths is not permission to absorb them.
+- Stop and investigate if provenance is ambiguous or a hook causes unexpectedly broad changes.
+
+Before requesting commit approval, inspect the exact staged diff and show its complete added, modified, renamed, and deleted file list. Use the format and review gate in git-workflow.md (`${HANDBOOK_ROOT}/skills/git-workflow/git-workflow.md`).
 
 ### Push an existing branch
 

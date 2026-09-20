@@ -320,6 +320,52 @@
           ]
         }
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Review this Kubernetes scheduling proposal: add a dedicated=payments:NoSchedule toleration and assume it forces the payments Pods onto dedicated nodes; require pod anti-affinity across zones even though the smallest supported cluster has one zone; and use ordinary kubelet-editable labels for PCI placement. Give the smallest safe correction.",
+      "expected_output": "A toleration only permits scheduling onto a matching tainted node; it does not select that node. Combine the toleration with required node affinity on a NodeRestriction-protected label for an exclusive dedicated pool. Do not use hard cross-zone pod anti-affinity when the minimum cluster has one zone because Pods will remain Pending. Use topology spread constraints for even replica distribution, choosing DoNotSchedule only when degraded capacity can satisfy it and ScheduleAnyway or preferred anti-affinity when availability is more important than perfect spread.",
+      "files": [],
+      "checks": [
+        {
+          "id": "distinguishes-permission-from-selection",
+          "type": "contains_all",
+          "values": [
+            "toleration only permits",
+            "does not select",
+            "node affinity"
+          ]
+        },
+        {
+          "id": "protects-placement-labels",
+          "type": "contains_all",
+          "values": [
+            "NodeRestriction",
+            "protected label",
+            "dedicated pool"
+          ]
+        },
+        {
+          "id": "rejects-infeasible-hard-affinity",
+          "type": "contains_all",
+          "values": [
+            "Do not use hard",
+            "one zone",
+            "Pending"
+          ]
+        },
+        {
+          "id": "selects-spread-policy-by-capacity",
+          "type": "contains_all",
+          "values": [
+            "topology spread constraints",
+            "DoNotSchedule",
+            "degraded capacity",
+            "ScheduleAnyway",
+            "preferred anti-affinity"
+          ]
+        }
+      ]
     }
   ]
 }

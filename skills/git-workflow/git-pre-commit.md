@@ -45,7 +45,7 @@ pre-commit autoupdate
 Hook `rev` values must resolve to exact tags or SHAs. After `autoupdate`, review every hook change for runtime, file-scope, and mutation differences, then run the full suite. Follow the dependency and toolchain currency workflow (`${HANDBOOK_ROOT}/skills/core-engineering/references/dependency-and-toolchain-currency.md`).
 
 > [!NOTE]
-> If a commit fails due to pre-commit hook changes (e.g., auto-formatting), stage the changes and retry. Some hooks modify files in place to fix issues automatically.
+> If a commit fails because a hook modified task-scoped files, inspect the hook delta, rerun applicable verification, stage the reviewed changes, and retry. Include required generated, configuration, or lockfile changes from an authorized upgrade in the same commit. Do not stage pre-existing or concurrent unrelated files; another user or agent session may own them. If hook provenance is ambiguous or unexpectedly broad, stop and investigate instead of using `git add -A`.
 
 ## Example `.pre-commit-config.yaml`
 

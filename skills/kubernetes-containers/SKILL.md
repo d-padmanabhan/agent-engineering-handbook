@@ -261,6 +261,18 @@ helm lint ./chart
 helm diff upgrade my-app ./chart
 ```
 
+## Scheduling and Placement
+
+Taints repel Pods; tolerations permit placement but do not select a node. Use
+node affinity for dedicated pools, pod affinity or anti-affinity for
+relationships between workloads, and topology spread constraints for balanced
+replicas across failure domains. Prefer soft constraints unless minimum and
+degraded cluster capacity can satisfy hard constraints.
+
+Follow the scheduling patterns and examples in the Kubernetes patterns
+reference
+(`${HANDBOOK_ROOT}/skills/kubernetes-containers/references/kubernetes-patterns.md#pod-placement-and-scheduling`).
+
 ## Detailed References
 
 - **Kubernetes Patterns**: See Kubernetes patterns (`${HANDBOOK_ROOT}/skills/kubernetes-containers/references/kubernetes-patterns.md`)
