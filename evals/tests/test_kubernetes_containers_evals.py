@@ -52,6 +52,7 @@ class KubernetesContainersEvalTests(unittest.TestCase):
         self.assertIn("protects-placement-labels", failed)
         self.assertIn("rejects-infeasible-hard-affinity", failed)
         self.assertIn("selects-spread-policy-by-capacity", failed)
+        self.assertIn("explains-topology-domain-and-soft-skew", failed)
 
 
 if __name__ == "__main__":

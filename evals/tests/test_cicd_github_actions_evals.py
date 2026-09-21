@@ -98,6 +98,23 @@ class CicdGithubActionsEvalTests(unittest.TestCase):
         self.assertIn("uses-job-scoped-oidc", failed)
         self.assertIn("removes-static-credential", failed)
 
+    def test_defaults_to_verified_major_and_allows_override(self) -> None:
+        """Require the default major alias and explicit pinning override."""
+        case = self.cases[6]
+
+        self.assertEqual(set(), self.failed_checks(6, case.expected_output))
+
+    def test_rejects_unverified_major_alias(self) -> None:
+        """Reject deriving a major alias without upstream verification."""
+        failed = self.failed_checks(
+            6,
+            "Use actions/checkout@v7 because v7.0.1 probably means that alias exists.",
+        )
+
+        self.assertIn("retains-release-provenance", failed)
+        self.assertIn("honors-explicit-user-override", failed)
+        self.assertIn("rejects-unverified-or-unsafe-refs", failed)
+
 
 if __name__ == "__main__":
     unittest.main()

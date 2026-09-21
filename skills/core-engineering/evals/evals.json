@@ -152,8 +152,8 @@
     },
     {
       "id": 3,
-      "prompt": "A SHA-pinned repository still uses old actions/checkout and actions/setup-python revisions. Using the attached official-release metadata, provide updated workflow refs. This repository requires Python 3.14 and uv; do not use an older Python, pip, or requirements.txt. Treat model memory as potentially stale, cite all three supplied release sources, state when the metadata was retrieved, and do not invent a moving major tag.",
-      "expected_output": "Use the supplied immutable release commit SHAs for actions/checkout v7.0.1, actions/setup-python v7.0.0, and astral-sh/setup-uv v10.0.1 with release comments. Configure Python 3.14 and uv without pip or requirements.txt, cite all official links, state the retrieval date, and explain that a release such as v10.0.1 does not prove a v10 tag exists.",
+      "prompt": "A repository uses old actions/checkout and actions/setup-python refs. Using the attached official-release metadata, provide updated workflow refs under the default major-alias policy. This repository requires Python 3.14 and uv; do not use an older Python, pip, or requirements.txt. Treat model memory as potentially stale, cite all three supplied release sources, state when the metadata was retrieved, and use only aliases verified by the supplied metadata.",
+      "expected_output": "Use the verified major aliases actions/checkout@v7, actions/setup-python@v7, and astral-sh/setup-uv@v10, with comments naming latest stable releases v7.0.1, v7.0.0, and v10.0.1. Configure Python 3.14 and uv without pip or requirements.txt, cite all official links, state the retrieval date, and explain that an explicit user request may instead select a verified exact stable tag or immutable commit SHA.",
       "files": [
         "evals/fixtures/current-action-releases.json"
       ],
@@ -181,11 +181,11 @@
           "value": "github.com/actions/setup-python"
         },
         {
-          "id": "uses-verified-action-shas",
+          "id": "uses-verified-major-aliases",
           "type": "contains_all",
           "values": [
-            "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-            "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+            "actions/checkout@v7",
+            "actions/setup-python@v7"
           ]
         },
         {
@@ -226,14 +226,18 @@
           "id": "configures-uv-in-ci",
           "type": "contains_all",
           "values": [
-            "astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d",
+            "astral-sh/setup-uv@v10",
             "uv sync"
           ]
         },
         {
-          "id": "rejects-invented-setup-uv-major",
-          "type": "not_contains",
-          "value": "astral-sh/setup-uv@v10"
+          "id": "allows-explicit-pinning-override",
+          "type": "contains_all",
+          "values": [
+            "explicit user request",
+            "exact stable tag",
+            "immutable commit SHA"
+          ]
         },
         {
           "id": "uses-least-privilege-workflow",

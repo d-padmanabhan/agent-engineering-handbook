@@ -12,17 +12,19 @@ Use this skill for Git procedures. Mandatory authorization and preservation gate
 1. Inspect the repository before changing it:
 
    ```bash
-   git status --short --branch
-   git branch --show-current
-   git rev-parse HEAD
+   GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"
+   git -C "$GIT_REPO_ROOT" status --short --branch
+   git -C "$GIT_REPO_ROOT" branch --show-current
+   git -C "$GIT_REPO_ROOT" rev-parse HEAD
    ```
 
-2. Preserve unrelated user changes. Never discard, stash, rewrite, or relocate them merely to simplify the task.
-3. Treat commit, push, force update, history rewrite, restore/discard, destructive branch deletion, and worktree removal as separate authorization boundaries.
-4. Run applicable tests, lint, formatting, type checks, and build steps before proposing a commit.
-5. Before committing, show the complete message and exact file list, then wait for explicit confirmation.
-6. Respect repository signing policy. If signing fails, stop; never silently create an unsigned commit.
-7. Before pushing, fetch with pruning and inspect upstream divergence. Do not blindly pull, rebase, merge, or force-push.
+2. Use the quoted `GIT_REPO_ROOT` variable for repository-relative paths and artifacts. Never derive the root from `pwd` or a workspace assumption.
+3. Preserve unrelated user changes. Never discard, stash, rewrite, or relocate them merely to simplify the task.
+4. Treat commit, push, force update, history rewrite, restore/discard, destructive branch deletion, and worktree removal as separate authorization boundaries.
+5. Run applicable tests, lint, formatting, type checks, and build steps before proposing a commit.
+6. Before committing, show the complete message and exact file list, then wait for explicit confirmation.
+7. Respect repository signing policy. If signing fails, stop; never silently create an unsigned commit.
+8. Before pushing, fetch with pruning and inspect upstream divergence. Do not blindly pull, rebase, merge, or force-push.
 
 ## Common Workflows
 

@@ -303,6 +303,13 @@ spec:
               app: payments-api
 ```
 
+`topologyKey` names the node label whose distinct values define scheduling
+domains. `labelSelector` identifies the Pods counted in the skew calculation
+and must match the intended pod-template labels. With `DoNotSchedule`,
+`maxSkew` is a hard scheduling threshold across eligible domains. With
+`ScheduleAnyway`, the scheduler uses skew to score nodes but may place a Pod
+even when the resulting skew exceeds `maxSkew`.
+
 The zone constraint is hard; the hostname preference is soft. Validate that
 the cluster has enough labeled, eligible zones before using `DoNotSchedule`.
 Missing topology labels or insufficient capacity can leave Pods Pending.

@@ -324,7 +324,7 @@
     {
       "id": 7,
       "prompt": "Review this Kubernetes scheduling proposal: add a dedicated=payments:NoSchedule toleration and assume it forces the payments Pods onto dedicated nodes; require pod anti-affinity across zones even though the smallest supported cluster has one zone; and use ordinary kubelet-editable labels for PCI placement. Give the smallest safe correction.",
-      "expected_output": "A toleration only permits scheduling onto a matching tainted node; it does not select that node. Combine the toleration with required node affinity on a NodeRestriction-protected label for an exclusive dedicated pool. Do not use hard cross-zone pod anti-affinity when the minimum cluster has one zone because Pods will remain Pending. Use topology spread constraints for even replica distribution, choosing DoNotSchedule only when degraded capacity can satisfy it and ScheduleAnyway or preferred anti-affinity when availability is more important than perfect spread.",
+      "expected_output": "A toleration only permits scheduling onto a matching tainted node; it does not select that node. Combine the toleration with required node affinity on a NodeRestriction-protected label for an exclusive dedicated pool. Do not use hard cross-zone pod anti-affinity when the minimum cluster has one zone because Pods will remain Pending. Use topology spread constraints for even replica distribution, choosing DoNotSchedule only when degraded capacity can satisfy it and ScheduleAnyway or preferred anti-affinity when availability is more important than perfect spread. topologyKey names the node label whose values define domains, and labelSelector must match the intended pod-template labels. Under ScheduleAnyway, maxSkew affects scheduler scoring but is not enforced as a hard threshold.",
       "files": [],
       "checks": [
         {
@@ -363,6 +363,21 @@
             "degraded capacity",
             "ScheduleAnyway",
             "preferred anti-affinity"
+          ]
+        },
+        {
+          "id": "explains-topology-domain-and-soft-skew",
+          "type": "contains_all",
+          "values": [
+            "topologyKey",
+            "node label",
+            "domains",
+            "labelSelector",
+            "pod-template labels",
+            "ScheduleAnyway",
+            "maxSkew",
+            "scheduler scoring",
+            "not enforced"
           ]
         }
       ]

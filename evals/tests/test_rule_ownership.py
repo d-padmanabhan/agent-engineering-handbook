@@ -125,7 +125,7 @@ class RuleOwnershipTests(unittest.TestCase):
             with self.subTest(content=stale_content):
                 self.assertNotIn(stale_content, documentation_rule)
 
-    def test_github_actions_uses_exact_latest_release_tags(self) -> None:
+    def test_github_actions_defaults_to_verified_major_aliases(self) -> None:
         github_actions_rule = (REPOSITORY_ROOT / "rules" / "160-github-actions.mdc").read_text(encoding="utf-8")
         github_actions_skill = (REPOSITORY_ROOT / "skills" / "cicd-github-actions" / "SKILL.md").read_text(
             encoding="utf-8"
@@ -134,7 +134,9 @@ class RuleOwnershipTests(unittest.TestCase):
         for content in (github_actions_rule, github_actions_skill):
             with self.subTest(source=content[:40]):
                 self.assertIn("releases/latest\" --jq '.tag_name'", content)
-                self.assertIn("latest stable release tag", content)
+                self.assertIn('major_tag="v${BASH_REMATCH[1]}"', content)
+                self.assertIn("git/ref/tags/${major_tag}", content)
+                self.assertIn("explicitly requests an exact stable tag or immutable commit SHA", content)
                 self.assertNotIn("latest_sha=", content)
                 self.assertNotIn("SHA-pinned repository", content)
                 self.assertNotIn("Preserve SHA posture", content)

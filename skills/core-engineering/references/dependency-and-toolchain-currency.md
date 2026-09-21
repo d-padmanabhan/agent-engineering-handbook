@@ -66,9 +66,8 @@ Do not hand-edit lockfiles. Use the native resolver and review the resulting gra
 
 - Inspect every `uses:` entry in a changed workflow.
 - Verify the exact Git ref. A latest release named `v10.0.1` does not prove a `v10` moving tag exists.
-- Preserve repository posture: immutable SHA pins stay SHA-pinned.
-- Prefer a verified immutable commit SHA plus a release comment when supply-chain policy requires it.
-- Otherwise use a verified exact release tag or verified moving major tag.
+- Default to the verified latest stable moving major alias.
+- If the user explicitly requests an exact stable tag or immutable commit SHA, verify and use that pinning mode instead.
 - Let Dependabot or Renovate propose future updates.
 
 ### pre-commit

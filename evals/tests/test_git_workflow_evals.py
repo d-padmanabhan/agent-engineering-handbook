@@ -51,6 +51,22 @@ class GitWorkflowEvalTests(unittest.TestCase):
         self.assertIn("reviews-and-reverifies-induced-diff", failed)
         self.assertIn("previews-exact-staged-scope", failed)
 
+    def test_repository_root_expected_output_satisfies_checks(self) -> None:
+        """Confirm the canonical repository-root response satisfies its checks."""
+        case = self.cases[5]
+
+        self.assertEqual(set(), self.failed_check_ids(case, case.expected_output))
+
+    def test_rejects_current_directory_as_repository_root(self) -> None:
+        """Require root discovery that works from nested directories."""
+        output = "Use pwd as the repository root and write .agent/reports relative to it."
+
+        failed = self.failed_check_ids(self.cases[5], output)
+
+        self.assertIn("uses-canonical-root-assignment", failed)
+        self.assertIn("quotes-root-references", failed)
+        self.assertIn("rejects-cwd-assumptions", failed)
+
 
 if __name__ == "__main__":
     unittest.main()

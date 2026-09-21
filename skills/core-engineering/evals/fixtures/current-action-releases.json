@@ -3,16 +3,19 @@
   "sources": {
     "actions/checkout": {
       "latest_release": "v7.0.1",
+      "verified_major_alias": "v7",
       "commit_sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
       "url": "https://github.com/actions/checkout/releases/tag/v7.0.1"
     },
     "actions/setup-python": {
       "latest_release": "v7.0.0",
+      "verified_major_alias": "v7",
       "commit_sha": "5fda3b95a4ea91299a34e894583c3862153e4b97",
       "url": "https://github.com/actions/setup-python/releases/tag/v7.0.0"
     },
     "astral-sh/setup-uv": {
       "latest_release": "v10.0.1",
+      "verified_major_alias": "v10",
       "commit_sha": "20cfd1bf945f4377ade1205e4dbc17946fc9a30d",
       "url": "https://github.com/astral-sh/setup-uv/releases/tag/v10.0.1"
     }

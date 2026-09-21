@@ -18,10 +18,14 @@ If you are not sure which repo you are in, STOP and ask the user to confirm.
 
 Collect context:
 
-- Repo root: `git rev-parse --show-toplevel`
-- Current branch: `git branch --show-current`
-- Current HEAD: `git rev-parse HEAD`
-- Remote: `git remote -v`
+```bash
+GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"
+git -C "$GIT_REPO_ROOT" branch --show-current
+git -C "$GIT_REPO_ROOT" rev-parse HEAD
+git -C "$GIT_REPO_ROOT" remote -v
+```
+
+Use the quoted `GIT_REPO_ROOT` variable for every repository-relative artifact path in this workflow.
 
 ---
 
@@ -159,7 +163,7 @@ Create the commit message file:
 
 Notes:
 
-- Use repo name from `basename "$(git rev-parse --show-toplevel)"`
+- Use repo name from `basename "$GIT_REPO_ROOT"`
 - Use branch name from `git branch --show-current`
 - Use last 7 of current HEAD via `git rev-parse --short=7 HEAD`
 - Ensure `tmp/` is gitignored before writing artifacts

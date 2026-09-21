@@ -165,7 +165,7 @@ No report is needed for trivial local-only actions with no commit/push and no ri
 
 Agents MUST resolve the absolute repository root path:
 
-- `export GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"`
+- `GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"`
 
 ### Path rules
 

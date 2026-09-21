@@ -193,23 +193,31 @@ jobs:
 
 ## Action-Version Audit
 
-Before changing workflow logic, audit every `uses:` reference. Query the latest stable GitHub release and use its exact release tag; do not derive a moving-major alias or resolve the release tag to a commit SHA.
+Before changing workflow logic, audit every `uses:` reference. By default, query the latest stable GitHub release, derive its major alias, verify that the upstream publishes the alias, and use that alias. If the user explicitly requests an exact stable tag or immutable commit SHA, verify and use the requested pinning mode instead.
 
 ```bash
 action="OWNER/REPO"
 latest_tag="$(gh api "repos/${action}/releases/latest" --jq '.tag_name')"
-printf 'uses: %s@%s\n' "${action}" "${latest_tag}"
+if [[ "${latest_tag}" =~ ^v([0-9]+)(\.[0-9]+){1,2}$ ]]; then
+  major_tag="v${BASH_REMATCH[1]}"
+else
+  printf 'Unsupported stable release tag: %s\n' "${latest_tag}" >&2
+  exit 1
+fi
+gh api "repos/${action}/git/ref/tags/${major_tag}" --silent
+printf 'uses: %s@%s # latest stable: %s\n' "${action}" "${major_tag}" "${latest_tag}"
 ```
 
 Decision matrix per finding:
 
 | Pin state | Action |
 |---|---|
-| Exact latest stable release tag | Retain after compatibility review |
-| SHA, moving major, older exact tag, `@main`, `@master`, `@latest`, unpinned, or invented alias | Replace with the verified latest stable release tag |
-| Archived, missing, prerelease-only, or no verifiable stable GitHub release | Stop and report; do not silently downgrade or replace |
+| Verified latest stable major alias | Retain after compatibility review |
+| Exact stable tag or immutable SHA explicitly requested by the user | Verify and retain the requested pinning mode |
+| Older major, older exact tag, `@main`, `@master`, `@latest`, unpinned, or invented alias | Replace with the verified latest stable major alias unless the user requested another verified mode |
+| Archived, missing, prerelease-only, or no verifiable stable release or major alias | Stop and report; do not silently downgrade or replace |
 
-Release tags are mutable Git references. Restrict workflows to reviewed actions, read release provenance and notes, preserve independently revertible upgrades, run `actionlint`, and let Dependabot or Renovate propose future updates. Follow the GitHub Actions rule (`${HANDBOOK_ROOT}/rules/160-github-actions.mdc`) and dependency currency workflow (`${HANDBOOK_ROOT}/skills/core-engineering/references/dependency-and-toolchain-currency.md`).
+Major aliases and release tags are mutable Git references. Restrict workflows to reviewed actions, read release provenance and notes, preserve independently revertible upgrades, run `actionlint`, and let Dependabot or Renovate propose future updates. Follow the GitHub Actions rule (`${HANDBOOK_ROOT}/rules/160-github-actions.mdc`) and dependency currency workflow (`${HANDBOOK_ROOT}/skills/core-engineering/references/dependency-and-toolchain-currency.md`).
 
 ## Detailed References
 

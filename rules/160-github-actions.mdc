@@ -135,22 +135,29 @@ jobs:
   - a header comment at the top of the YAML
   - repo docs like `GHA-RULESET.md` or `README.md`
 
-- Pin every action to its verified latest stable release tag. Use the exact release tag, not a derived moving-major alias or resolved commit SHA.
-- Never use `@main`, `@master`, `@latest`, an unverified alias, or an invented tag.
+- Default every action to its verified latest stable major release alias, such as `@v7`, when the upstream repository publishes and maintains that alias.
+- An explicit user request may instead select a verified exact stable release tag or immutable commit SHA. Never use `@main`, `@master`, `@latest`, an unverified alias, or an invented tag.
 
 **For AI Agents Authoring or Reviewing Workflows:**
 
-For every action in a changed workflow, query and use the latest stable release tag:
+For every action in a changed workflow, query the latest stable release, derive its major alias, and verify that alias exists:
 
 ```bash
 action="OWNER/REPO"
 latest_tag="$(gh api "repos/${action}/releases/latest" --jq '.tag_name')"
-printf 'uses: %s@%s\n' "${action}" "${latest_tag}"
+if [[ "${latest_tag}" =~ ^v([0-9]+)(\.[0-9]+){1,2}$ ]]; then
+  major_tag="v${BASH_REMATCH[1]}"
+else
+  printf 'Unsupported stable release tag: %s\n' "${latest_tag}" >&2
+  exit 1
+fi
+gh api "repos/${action}/git/ref/tags/${major_tag}" --silent
+printf 'uses: %s@%s # latest stable: %s\n' "${action}" "${major_tag}" "${latest_tag}"
 ```
 
-Use `OWNER/REPO@<latest-release-tag>` exactly as returned by the API. Do not replace it with a moving major tag or resolve it to a commit SHA. If the action is archived, missing, prerelease-only, or has no verifiable stable GitHub release, stop and report it; do not invent, downgrade, or replace the ref silently.
+Use the verified `OWNER/REPO@v<major>` alias by default. If the user explicitly requests an exact stable tag or immutable commit SHA, verify and use that requested pinning mode instead. If the action or major alias is archived, missing, prerelease-only, or unverifiable, stop and report it; do not invent, downgrade, or replace the ref silently.
 
-Release tags are mutable Git references. Restrict workflows to reviewed actions, review release provenance and notes, run `actionlint`, execute repository checks, and keep upgrades independently revertible. Dependabot or Renovate should propose future updates.
+Major aliases and release tags are mutable Git references. Restrict workflows to reviewed actions, review release provenance and notes, run `actionlint`, execute repository checks, and keep upgrades independently revertible. Dependabot or Renovate should propose future updates.
 
 - Review [https://docs.github.com/en/actions](https://docs.github.com/en/actions) and adopt relevant best practices
 

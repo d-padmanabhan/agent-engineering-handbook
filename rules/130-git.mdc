@@ -12,6 +12,7 @@ This rule contains only mandatory policy. Use the Git workflow skill (`${HANDBOO
 ## Preserve User Work
 
 - Inspect `git status --short`, the current branch, and `HEAD` before repository edits.
+- Resolve the absolute repository root once as `GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"`. Use the quoted variable for repository-relative paths and artifacts; do not infer the root from the current directory.
 - Preserve unrelated staged, unstaged, and untracked changes.
 - Treat pre-existing paths outside the authorized task as potentially owned by another user or agent session. Do not edit, format, stage, rename, move, or delete them.
 - Include reviewed files changed directly by task-scoped pre-commit hooks, generators, or an authorized dependency/tool upgrade when they are required for the commit. This exception does not authorize absorbing pre-existing or concurrent unrelated changes.

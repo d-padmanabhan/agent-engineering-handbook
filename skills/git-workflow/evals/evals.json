@@ -180,6 +180,39 @@
           ]
         }
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "A Git automation can be launched from the repository root or a deeply nested directory. It needs to inspect Git state and write a report under .agent/reports. Show how it should establish and use the repository root without relying on the current directory.",
+      "expected_output": "Resolve GIT_REPO_ROOT=\"$(git rev-parse --show-toplevel)\" once. Use quoted references such as git -C \"$GIT_REPO_ROOT\" status and \"$GIT_REPO_ROOT/.agent/reports\" for artifacts. Do not derive the repository root from pwd, a fixed parent traversal, or a workspace-specific absolute path.",
+      "files": [],
+      "checks": [
+        {
+          "id": "uses-canonical-root-assignment",
+          "type": "contains",
+          "value": "GIT_REPO_ROOT=\"$(git rev-parse --show-toplevel)\"",
+          "case_sensitive": true
+        },
+        {
+          "id": "quotes-root-references",
+          "type": "contains_all",
+          "values": [
+            "git -C \"$GIT_REPO_ROOT\"",
+            "\"$GIT_REPO_ROOT/.agent/reports\""
+          ],
+          "case_sensitive": true
+        },
+        {
+          "id": "rejects-cwd-assumptions",
+          "type": "contains_all",
+          "values": [
+            "Do not",
+            "pwd",
+            "fixed parent",
+            "workspace-specific absolute path"
+          ]
+        }
+      ]
     }
   ]
 }

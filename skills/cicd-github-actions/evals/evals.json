@@ -183,6 +183,52 @@
           ]
         }
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "The latest stable actions/checkout release is v7.0.1, and the repository confirms that refs/tags/v7 exists. No pinning mode was requested. State the default uses ref and explain what changes if the user explicitly requests an exact stable tag or immutable commit SHA.",
+      "expected_output": "Default to actions/checkout@v7 because v7 is the verified latest stable major alias. Record or review the v7.0.1 release provenance. If the user explicitly requests a different pinning mode, verify and use actions/checkout@v7.0.1 for the exact stable tag or the verified immutable commit SHA. Never invent a major alias from a release number without confirming the upstream ref exists, and never use @main, @master, or @latest.",
+      "files": [],
+      "checks": [
+        {
+          "id": "defaults-to-verified-major",
+          "type": "contains_all",
+          "values": [
+            "Default",
+            "actions/checkout@v7",
+            "verified",
+            "major alias"
+          ]
+        },
+        {
+          "id": "retains-release-provenance",
+          "type": "contains_all",
+          "values": [
+            "v7.0.1",
+            "release provenance"
+          ]
+        },
+        {
+          "id": "honors-explicit-user-override",
+          "type": "contains_all",
+          "values": [
+            "explicitly requests",
+            "actions/checkout@v7.0.1",
+            "immutable commit SHA"
+          ]
+        },
+        {
+          "id": "rejects-unverified-or-unsafe-refs",
+          "type": "contains_all",
+          "values": [
+            "Never invent",
+            "confirming the upstream ref exists",
+            "@main",
+            "@master",
+            "@latest"
+          ]
+        }
+      ]
     }
   ]
 }

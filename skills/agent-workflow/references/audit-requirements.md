@@ -87,7 +87,7 @@ When a full report is required:
 
 **Repo root (required):**
 
-- `export GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"`
+- `GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"`
 
 **Path rules:**
 

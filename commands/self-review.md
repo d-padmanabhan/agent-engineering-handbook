@@ -163,7 +163,7 @@ Generate a structured review report:
 
 **Generate an audit report when required by 020-agent-audit.mdc (`${HANDBOOK_ROOT}/rules/020-agent-audit.mdc`):**
 
-- Ensure `GIT_REPO_ROOT` is set, create `<GIT_REPO_ROOT>/.agent/reports/` when needed, then write/append the report to `<GIT_REPO_ROOT>/.agent/reports/$(date +%F)-agent-report-<repo>-<branch>.md`
+- Resolve `GIT_REPO_ROOT="$(git rev-parse --show-toplevel)"`, create `<GIT_REPO_ROOT>/.agent/reports/` when needed, then write/append the report to `<GIT_REPO_ROOT>/.agent/reports/$(date +%F)-agent-report-<repo>-<branch>.md`
 - Include:
   - Start/end timestamps (local and UTC)
   - Repo name, branch name, `HEAD` SHA
