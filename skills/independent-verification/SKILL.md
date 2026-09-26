@@ -15,7 +15,7 @@ The mandatory trigger and release gate are owned by the workflow rule (`${HANDBO
 2. **Freeze the review target.** Bind the request to an exact commit SHA and SHA-256 digest of the reviewed diff or patch. Moving branches and mutable working trees are not approval targets.
 3. **Separate implementer and verifier.** Prefer a different tool and model provider. At minimum, use a fresh session with no implementer reasoning or hidden chain-of-thought.
 4. **Keep the verifier read-only.** It reports findings and a verdict. It does not edit files, run deployments, write Git state, dismiss findings, or approve its own output.
-5. **Use a trusted controller.** A small deterministic wrapper creates worktrees, runs commands, enforces limits, checks hashes, and writes artifacts. The model never receives broad credentials or arbitrary write authority.
+5. **Use a trusted controller.** A small deterministic wrapper runs commands, enforces limits, checks hashes, and writes artifacts. It may create a worktree only after explicit HITL approval of the exact repository, destination path, branch, base ref, and command. The model never receives broad credentials or arbitrary write authority.
 6. **Invalidate stale verdicts.** Any reviewed-file, commit, diff-hash, requirement, policy, or deterministic-evidence change requires another verification.
 7. **AI verdicts are advisory.** A model cannot satisfy a mandatory human approval, CODEOWNERS review, protected-environment approval, or regulated sign-off.
 
@@ -75,7 +75,10 @@ shasum -a 256 <reviewed-patch>
 shasum -a 256 scope-manifest.txt
 ```
 
-Prefer a clean, detached, read-only worktree at the target commit.
+Prefer a clean, detached, read-only worktree at the target commit when its
+creation has received the separate explicit HITL approval required by the Git
+workflow rule. Otherwise, use an already approved checkout or a snapshot that
+does not mutate the user's working tree.
 
 For uncommitted work, the trusted controller must snapshot tracked, staged, unstaged, and untracked scoped files without modifying the real index. One Git-native approach is a temporary index:
 
@@ -215,9 +218,10 @@ Models cannot vote to break a tie. Do not average security vetoes into a weighte
 
 ## Trusted Controller Boundary
 
-The controller may:
+After the applicable authorization gate, the controller may:
 
-- create and remove isolated worktrees;
+- create or remove an isolated worktree only when that exact operation has
+  separate explicit HITL approval;
 - run allowlisted deterministic commands;
 - capture stdout, stderr, exit codes, and artifact hashes;
 - invoke a verifier with read-only capabilities;

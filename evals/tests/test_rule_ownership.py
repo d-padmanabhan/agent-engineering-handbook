@@ -12,6 +12,7 @@ RULE_LINE_BUDGETS: dict[str, int] = {
     "100-core.mdc": 180,
     "130-git.mdc": 100,
     "140-bash.mdc": 100,
+    "160-github-actions.mdc": 150,
     "200-python.mdc": 100,
     "225-javascript-typescript.mdc": 110,
     "310-security.mdc": 100,
@@ -24,6 +25,7 @@ RULE_LINE_BUDGETS: dict[str, int] = {
 }
 SCOPED_RULES: tuple[str, ...] = (
     "140-bash.mdc",
+    "160-github-actions.mdc",
     "200-python.mdc",
     "225-javascript-typescript.mdc",
     "320-api-design.mdc",
@@ -140,6 +142,22 @@ class RuleOwnershipTests(unittest.TestCase):
                 self.assertNotIn("latest_sha=", content)
                 self.assertNotIn("SHA-pinned repository", content)
                 self.assertNotIn("Preserve SHA posture", content)
+
+    def test_github_actions_rule_contains_gates_not_archived_tutorials(self) -> None:
+        github_actions_rule = (REPOSITORY_ROOT / "rules" / "160-github-actions.mdc").read_text(encoding="utf-8")
+
+        self.assertIn("## Workflow Documentation", github_actions_rule)
+        self.assertIn("## Token, Event, and Runner Trust", github_actions_rule)
+        self.assertIn("## Reliability and Resource Bounds", github_actions_rule)
+        self.assertIn("${HANDBOOK_ROOT}/skills/cicd-github-actions/SKILL.md", github_actions_rule)
+        for removed_heading in (
+            "## Common Workflow Patterns",
+            "## Troubleshooting Guide",
+            "## Archives",
+            "# ARCHIVES",
+        ):
+            with self.subTest(heading=removed_heading):
+                self.assertNotIn(removed_heading, github_actions_rule)
 
     def test_workflow_publishes_stable_handbook_root(self) -> None:
         workflow_rule: str = (REPOSITORY_ROOT / "rules" / "010-workflow.mdc").read_text(encoding="utf-8")

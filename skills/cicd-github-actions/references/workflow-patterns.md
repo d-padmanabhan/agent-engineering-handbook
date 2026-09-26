@@ -5,20 +5,39 @@
 ```yaml
 name: PR Check
 
+# ================================================================
+# Purpose: Lints and tests pull-request code without deployment access
+#
+# Triggers:
+#   - Pull requests targeting main
+#
+# Required Secrets:
+#   - None
+#
+# Dependencies:
+#   - Repository lockfile and test configuration
+# ================================================================
+
 on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -26,19 +45,24 @@ jobs:
       - run: npm run lint
 
   test:
+    name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
       - run: npm test -- --coverage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage/
+          retention-days: 7
 ```
 
 ## Release Workflow
@@ -46,32 +70,49 @@ jobs:
 ```yaml
 name: Release
 
+# ================================================================
+# Purpose: Builds and publishes a tagged npm release
+#
+# Triggers:
+#   - Version tags
+#
+# Required Secrets:
+#   - NPM_TOKEN: publishes the package to the registry
+#
+# Dependencies:
+#   - Valid package metadata and lockfile
+#   - Package release runbook for partial publication
+# ================================================================
+
 on:
   push:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-  packages: write
+permissions: {}
 
 jobs:
   release:
+    name: Publish release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      
+
       - run: npm ci
       - run: npm run build
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
-      - uses: softprops/action-gh-release@v1
+
+      - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
 ```
@@ -81,38 +122,56 @@ jobs:
 ```yaml
 name: Docker
 
+# ================================================================
+# Purpose: Builds and publishes versioned container images
+#
+# Triggers:
+#   - Push to main
+#   - Version tags
+#
+# Required Secrets:
+#   - None: publication uses the job-scoped repository token
+#
+# Dependencies:
+#   - GitHub Container Registry
+#   - Valid container build definition
+# ================================================================
+
 on:
   push:
     branches: [main]
     tags: ['v*']
 
-permissions:
-  contents: read
-  packages: write
+permissions: {}
 
 jobs:
   build:
+    name: Build and publish image
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: docker/setup-buildx-action@v3
-      
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - uses: docker/metadata-action@v5
+
+      - uses: docker/metadata-action@v6
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-      
-      - uses: docker/build-push-action@v5
+
+      - uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -126,16 +185,40 @@ jobs:
 ```yaml
 name: Scheduled Tasks
 
+# ================================================================
+# Purpose: Runs bounded repository maintenance
+#
+# Triggers:
+#   - Daily schedule
+#   - Manual workflow dispatch
+#
+# Required Secrets:
+#   - None
+#
+# Dependencies:
+#   - Repository maintenance scripts
+# ================================================================
+
 on:
   schedule:
     - cron: '0 0 * * *'  # Daily at midnight UTC
   workflow_dispatch:  # Manual trigger
 
+permissions: {}
+
+concurrency:
+  group: scheduled-maintenance
+  cancel-in-progress: false
+
 jobs:
   cleanup:
+    name: Run maintenance
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./scripts/cleanup.sh
 ```
 
@@ -144,26 +227,51 @@ jobs:
 ```yaml
 name: Deploy
 
+# ================================================================
+# Purpose: Promotes a tested release through protected environments
+#
+# Triggers:
+#   - Push to main
+#
+# Required Secrets:
+#   - None: deployment uses environment-scoped OIDC
+#
+# Dependencies:
+#   - Tested release artifact
+#   - Production GitHub Environment approval
+#   - Deployment rollback runbook
+# ================================================================
+
 on:
   push:
     branches: [main]
 
+permissions: {}
+
 jobs:
   staging:
+    name: Deploy to staging
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: staging
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./deploy.sh staging
 
   production:
+    name: Deploy to production
     needs: staging
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: production
       url: https://app.acme.com
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./deploy.sh production
 ```
 
@@ -204,10 +312,10 @@ steps:
 ### Hardcoding Runner OS Commands
 
 ```yaml
-# ❌ Fragile - Breaks on Windows/macOS
+# BAD: Breaks on Windows and macOS
 - run: rm -rf dist/
 
-# ✅ Portable - Use actions or shell-agnostic commands
+# GOOD: Select Bash explicitly and check the path
 - run: |
     if [ -d dist ]; then rm -rf dist; fi
   shell: bash
@@ -216,13 +324,13 @@ steps:
 ### Not Cleaning Up Artifacts
 
 ```yaml
-# ❌ Artifacts kept for 90 days (GitHub default)
-- uses: actions/upload-artifact@v4
+# BAD: Retention is not tied to operational need
+- uses: actions/upload-artifact@v7
   with:
     name: logs
 
-# ✅ Set appropriate retention
-- uses: actions/upload-artifact@v4
+# GOOD: Set intentional retention
+- uses: actions/upload-artifact@v7
   with:
     name: logs
     retention-days: 7  # Adjust based on needs
@@ -231,12 +339,12 @@ steps:
 ### Missing Timeout Protection
 
 ```yaml
-# ❌ Can run for 6 hours (GitHub default)
+# BAD: Job runtime is not bounded
 jobs:
   build:
     runs-on: ubuntu-latest
 
-# ✅ Set reasonable timeout
+# GOOD: Set a justified timeout
 jobs:
   build:
     runs-on: ubuntu-latest

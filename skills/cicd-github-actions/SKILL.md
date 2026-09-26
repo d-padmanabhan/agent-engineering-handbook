@@ -20,23 +20,47 @@ description: GitHub Actions best practices for CI/CD workflows. Covers security 
 - [ ] Timeout values set on all jobs
 - [ ] Caching implemented for dependencies
 - [ ] PR workflows use `pull_request`, not `pull_request_target`
-- [ ] A concise purpose comment follows the workflow `name:`
+- [ ] A bordered operational header follows the workflow `name:`
 - [ ] Untrusted contexts and inputs reach shell commands through step-level `env`
 - [ ] Production deploys use protected GitHub Environments
 - [ ] Changed workflows pass `actionlint`
 
 ## Workflow Authoring Contract
 
-Put a short operational description immediately after the workflow name. Document only what an operator or reviewer needs: purpose, triggers, required credentials, external dependencies, and approval gates.
+Put a bordered operational comment block immediately after the workflow name.
+Use the headings `Purpose`, `Triggers`, `Required Secrets`, and `Dependencies`,
+with blank comment lines between sections. Record approval, rollback, recovery,
+or runbook requirements under `Dependencies`.
 
 ```yaml
 name: Deploy Application
 
-# Deploys a tested release to the selected GitHub Environment.
-# Triggers: manual dispatch.
-# Authentication: cloud OIDC; no static cloud credentials.
-# Approval: the production environment requires reviewers.
+# ================================================================
+# Purpose: Deploys a tested release to a protected environment
+#
+# Triggers:
+#   - Manual workflow dispatch
+#
+# Required Secrets:
+#   - None: cloud authentication uses OIDC
+#
+# Dependencies:
+#   - Published release artifact
+#   - Production GitHub Environment approval
+#   - Rollback runbook: docs/deployment-rollback.md
+# ================================================================
 ```
+
+Document reusable workflow and action inputs, outputs, secrets, defaults, and
+side effects where they are declared. Give jobs and non-obvious steps
+descriptive names, but do not add comments that merely restate YAML. Keep
+secret values, sensitive identifiers, and production data out of comments,
+summaries, logs, and artifacts.
+
+Use the
+[workflow documentation reference](references/workflow-documentation.md) for
+the complete header pattern, interface descriptions, comments, summaries, and
+review checklist.
 
 Treat `${{ github.event.* }}`, `${{ inputs.* }}`, issue text, branch names, and action outputs as untrusted data. Do not interpolate them directly into a `run:` script. Assign them to step-level `env`, quote the shell variable, and validate constrained values before use. See [Security](references/security.md).
 
@@ -46,6 +70,20 @@ For a complete starting point and local validation commands, use the [minimum vi
 
 ```yaml
 name: CI
+
+# ================================================================
+# Purpose: Runs bounded validation for main and pull requests
+#
+# Triggers:
+#   - Push to main
+#   - Pull requests targeting main
+#
+# Required Secrets:
+#   - None
+#
+# Dependencies:
+#   - Repository lockfile and test configuration
+# ================================================================
 
 on:
   push:
@@ -57,13 +95,15 @@ permissions: {}
 
 jobs:
   test:
+    name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Job-level permissions
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - run: npm ci
@@ -73,13 +113,13 @@ jobs:
 ## Caching
 
 ```yaml
-- uses: actions/setup-node@v4
+- uses: actions/setup-node@v7
   with:
     node-version: '20'
     cache: 'npm'
 
 # Or explicit caching
-- uses: actions/cache@v4
+- uses: actions/cache@v6
   with:
     path: ~/.npm
     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -92,15 +132,19 @@ jobs:
 ```yaml
 jobs:
   test:
+    name: Test Node.js ${{ matrix.node-version }} on ${{ matrix.os }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         node-version: [18, 20, 22]
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
@@ -135,23 +179,42 @@ steps:
 # .github/workflows/reusable-build.yml
 name: Reusable Build
 
+# ================================================================
+# Purpose: Builds and tests one supported Node.js version for a caller
+#
+# Triggers:
+#   - Reusable workflow call
+#
+# Required Secrets:
+#   - NPM_TOKEN: required only for private dependencies
+#
+# Dependencies:
+#   - Caller supplies a supported Node.js version
+# ================================================================
+
 on:
   workflow_call:
     inputs:
       node-version:
+        description: Supported Node.js version to build and test.
         required: false
         type: string
         default: '20'
     secrets:
       NPM_TOKEN:
+        description: Registry token required only for private dependencies.
         required: false
+
+permissions: {}
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
       - run: npm ci
@@ -179,7 +242,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - id: version
-        run: echo "value=$(cat VERSION)" >> $GITHUB_OUTPUT
+        run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: build
@@ -221,6 +284,7 @@ Major aliases and release tags are mutable Git references. Restrict workflows to
 
 ## Detailed References
 
+- **Workflow Documentation**: See [references/workflow-documentation.md](references/workflow-documentation.md)
 - **Minimum Viable Workflow**: See [references/minimum-viable-workflow.md](references/minimum-viable-workflow.md)
 - **Workflow Patterns**: See [references/workflow-patterns.md](references/workflow-patterns.md)
 - **Security**: See [references/security.md](references/security.md)

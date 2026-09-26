@@ -115,6 +115,30 @@ class CicdGithubActionsEvalTests(unittest.TestCase):
         self.assertIn("honors-explicit-user-override", failed)
         self.assertIn("rejects-unverified-or-unsafe-refs", failed)
 
+    def test_requires_operational_workflow_documentation(self) -> None:
+        """Reject a workflow header that only restates its title."""
+        failed = self.failed_checks(
+            7,
+            "name: Deploy Application\n\n# Deploys the application.",
+        )
+
+        self.assertIn("places-purpose-after-workflow-name", failed)
+        self.assertIn("documents-operational-contract", failed)
+        self.assertIn("documents-reusable-interface", failed)
+        self.assertIn("keeps-documentation-safe-and-useful", failed)
+
+    def test_rejects_direct_secret_condition_and_input_interpolation(self) -> None:
+        """Require supported secret conditions and safe shell data flow."""
+        failed = self.failed_checks(
+            8,
+            "Keep `if: ${{ secrets.PUBLISH_TOKEN != '' }}` and quote "
+            '`"${{ inputs.version }}"`; quoting makes both safe.',
+        )
+
+        self.assertIn("corrects-secret-condition", failed)
+        self.assertIn("corrects-publish-input-boundary", failed)
+        self.assertIn("validates-version-input", failed)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -74,6 +74,36 @@ For providers without metadata, maintain a durable, transactional ownership
 registry with uniqueness constraints and recovery procedures. A status field
 alone is not that registry.
 
+## Event Sources and Informers
+
+Do not build a raw Kubernetes `Watch` loop for a normal operator. Correctly
+handling the initial list, resource versions, expired history, reconnects,
+backoff, duplicate events, bookmarks, shutdown, and relisting is easy to get
+wrong.
+
+With controller-runtime, prefer its managed event pipeline:
+
+- use `Manager` and the managed cache for lifecycle and informer sharing;
+- declare the primary resource with `For`;
+- declare owned resources with `Owns`;
+- declare other dependencies with `Watches`, field indexes, and mapping
+  functions;
+- use predicates only to remove irrelevant events without suppressing required
+  recovery paths.
+
+Use client-go `SharedInformerFactory` only when operating below
+controller-runtime or when a documented integration requirement needs direct
+informer access. Start and stop it with the process lifecycle, wait for cache
+sync before depending on its state, and keep handlers fast and non-blocking.
+A direct raw watch is reserved for specialized low-level components with
+explicit tests for list-watch recovery and shutdown.
+
+Do not copy a short fixed resync interval such as five seconds as a default.
+Resync is not the primary correctness mechanism and should not compensate for
+missing watches or a non-convergent reconciler. Use dependency watches for
+changes, `RequeueAfter` for a resource-specific bounded drift check, and a
+global resync period only for a measured, documented need.
+
 ## Cached Reads and Writes
 
 The default controller-runtime client normally reads from a shared informer

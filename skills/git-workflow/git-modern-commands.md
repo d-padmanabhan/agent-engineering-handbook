@@ -92,10 +92,17 @@ Git worktrees allow you to work on multiple branches simultaneously in separate 
 - Running long tests on one branch while coding on another
 - Comparing implementations side-by-side
 
+> [!CAUTION]
+> Worktree creation is a HITL-gated mutation. Before `git worktree add`,
+> `phantom create`, or an equivalent tool, show the exact repository,
+> destination path, branch, base ref, and command, then wait for explicit human
+> approval. A request to implement, branch, parallelize, or preserve a dirty
+> worktree is not approval.
+
 ### Basic Worktree Usage
 
 ```bash
-# Create a new feature branch from the refreshed remote base
+# Preview only until explicitly approved
 git fetch origin --prune
 git worktree add -b feature/auth ../myproject-feature-auth origin/main
 
@@ -106,7 +113,9 @@ git worktree list
 git worktree remove ../myproject-feature-auth
 ```
 
-Choose a new sibling path that does not already exist. This is the required isolation pattern when the current worktree contains user changes; do not use `git switch -c` and carry those changes onto the agent branch.
+After approval, choose a new sibling path that does not already exist. When the
+current worktree contains user changes, do not use `git switch -c` and carry
+those changes onto the agent branch.
 
 ### Phantom (Recommended Tool)
 
@@ -123,7 +132,7 @@ npm install -g @aku11i/phantom
 **Basic Usage:**
 
 ```bash
-# Create a worktree for a new feature
+# Creation requires the same explicit HITL approval
 phantom create feature-auth
 
 # List all worktrees
@@ -152,5 +161,6 @@ phantom create --pr 123
 phantom create --issue 456
 ```
 
-> [!TIP]
-> For parallel AI development, configure the Phantom MCP server in your editor. AI agents can then create isolated worktrees for each feature, enabling true parallel development without branch conflicts.
+Phantom does not change the authorization boundary. Agents must not invoke its
+creation commands without the same explicit HITL approval required for
+`git worktree add`.

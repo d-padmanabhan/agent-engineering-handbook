@@ -189,6 +189,65 @@
           ]
         }
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "Design the Go quality gate for a repository. A teammate proposes requiring a 90/100 score from gocode-score and using the retired Go Report Card grade instead of the existing checks. Explain the production-safe gate, complete golangci-lint reporting, and any appropriate use of function-level CRAP analysis.",
+      "expected_output": "Keep deterministic gates: gofmt, go vet, golangci-lint, go test -race, coverage evidence, and govulncheck. Pin golangci-lint and commit its explicit configuration. For complete CI diagnostics, set max-issues-per-linter: 0 and max-same-issues: 0; these are reporting controls, not quality thresholds. Do not replace deterministic checks with a letter grade or /100 score, and do not weaken checks or add unjustified suppressions to improve a score. The hosted Go Report Card service is retired, while gocode-score and codescore are experimental advisory tools rather than default gates. Function-level CRAP analysis may be used with a documented threshold to identify complexity plus low-coverage hotspots, but it is not proof of correctness.",
+      "files": [],
+      "checks": [
+        {
+          "id": "retains-deterministic-go-gates",
+          "type": "contains_all",
+          "values": [
+            "gofmt",
+            "go vet",
+            "golangci-lint",
+            "go test -race",
+            "govulncheck"
+          ]
+        },
+        {
+          "id": "requires-complete-lint-reporting",
+          "type": "contains_all",
+          "values": [
+            "max-issues-per-linter: 0",
+            "max-same-issues: 0",
+            "reporting"
+          ]
+        },
+        {
+          "id": "rejects-score-as-quality-gate",
+          "type": "contains_all",
+          "values": [
+            "Do not replace",
+            "score",
+            "suppressions"
+          ]
+        },
+        {
+          "id": "classifies-retired-and-experimental-tools",
+          "type": "contains_all",
+          "values": [
+            "Go Report Card",
+            "retired",
+            "gocode-score",
+            "codescore",
+            "advisory"
+          ]
+        },
+        {
+          "id": "limits-crap-to-hotspot-analysis",
+          "type": "contains_all",
+          "values": [
+            "CRAP",
+            "complexity",
+            "coverage",
+            "hotspot",
+            "not proof"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -105,6 +105,21 @@ class KubernetesOperatorDevelopmentEvalTests(unittest.TestCase):
         self.assertIn("rejects-generation-only-recovery", failed)
         self.assertIn("watches-referenced-secret", failed)
 
+    def test_rejects_raw_watch_and_short_global_resync(self) -> None:
+        """Require managed informers and intentional event sources."""
+        output = (
+            "Call Watch directly and restart it after errors. If events are "
+            "missed, run every SharedInformerFactory on a five-second resync."
+        )
+
+        failed = self.failed_check_ids(self.cases[9], output)
+
+        self.assertIn("uses-controller-runtime-managed-events", failed)
+        self.assertIn("maps-secret-dependencies", failed)
+        self.assertIn("rejects-raw-watch-loop", failed)
+        self.assertIn("limits-direct-shared-informers", failed)
+        self.assertIn("rejects-short-resync-as-correctness", failed)
+
 
 if __name__ == "__main__":
     unittest.main()

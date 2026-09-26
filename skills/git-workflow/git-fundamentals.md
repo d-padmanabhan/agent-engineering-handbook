@@ -69,7 +69,7 @@ Now every `git fetch` and `git pull` automatically removes stale remote-tracking
 ## Robust Feature Branch Workflow
 
 > [!IMPORTANT]
-> Before creating any feature branch, fetch the remote and prove the selected base is current. Branch creation from a stale base is blocked. If the current worktree contains user changes, do not switch branches or stash those changes; create an isolated worktree from `origin/main`.
+> Before creating any feature branch, fetch the remote and prove the selected base is current. Branch creation from a stale base is blocked. If the current worktree contains user changes, do not switch branches or stash those changes. An isolated worktree may be proposed, but it cannot be created without explicit HITL approval of the exact repository, path, branch, base ref, and command.
 
 Required pre-branch proof:
 
@@ -127,16 +127,20 @@ git switch -c feat/your-feature origin/main
 
 **Use when:** Local `main` is stale and the current worktree is verified clean.
 
-### Dirty Worktree - Isolated Worktree Required
+### Dirty Worktree - Worktree Requires HITL Approval
 
-Create a new sibling worktree so user changes remain untouched:
+Preview a new sibling worktree so user changes remain untouched:
 
 ```bash
 git fetch origin --prune
 git worktree add -b feat/your-feature "../repo-feature" origin/main
 ```
 
-Choose a sibling path that does not already exist and perform all feature work there.
+Do not execute the preview until a human explicitly approves the exact
+repository, destination path, branch, base ref, and command. A request to
+create a branch or continue implementation is not worktree approval. After
+approval, choose a sibling path that does not already exist and perform all
+feature work there.
 
 > [!IMPORTANT]
 > `git switch -c` is prohibited for this path because Git can carry compatible uncommitted changes onto the new branch. The mandatory preservation gate is in the Git rule (`${HANDBOOK_ROOT}/rules/130-git.mdc#preserve-user-work`).

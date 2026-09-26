@@ -229,6 +229,88 @@
           ]
         }
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Create the documentation header and interface guidance for a manually triggered production deployment workflow. It accepts environment and version inputs, uses cloud OIDC, depends on a published artifact and an external deployment API, requires production approval, and has a rollback runbook.",
+      "expected_output": "Place `name: Deploy Application` first and put the bordered operational comment block immediately after the workflow name:\n\nname: Deploy Application\n\n# ================================================================\n# Purpose: Deploys a previously tested release to a protected environment\n#\n# Triggers:\n#   - Manual workflow dispatch with environment and version inputs\n#\n# Required Secrets:\n#   - None: cloud authentication uses OIDC\n#\n# Dependencies:\n#   - Published release artifact\n#   - Acme deployment API\n#   - Production GitHub Environment approval\n#   - Rollback runbook: docs/deployment-rollback.md\n# ================================================================\n\nGive the environment and version inputs descriptions, types, required settings, and constrained formats. Document outputs and side effects where declared. Use descriptive job and non-obvious step names, keep detailed procedures in the linked runbook, and never place secret values or sensitive production data in comments, summaries, logs, or artifacts.",
+      "files": [],
+      "checks": [
+        {
+          "id": "places-purpose-after-workflow-name",
+          "type": "regex",
+          "pattern": "name:\\s*Deploy Application\\s*\\n\\s*# ={20,}\\s*\\n# Purpose:"
+        },
+        {
+          "id": "documents-operational-contract",
+          "type": "contains_all",
+          "values": [
+            "# Triggers:",
+            "# Required Secrets:",
+            "# Dependencies:",
+            "GitHub Environment approval",
+            "Rollback runbook"
+          ]
+        },
+        {
+          "id": "documents-reusable-interface",
+          "type": "contains_all",
+          "values": [
+            "inputs",
+            "descriptions",
+            "types",
+            "required",
+            "outputs",
+            "side effects"
+          ]
+        },
+        {
+          "id": "keeps-documentation-safe-and-useful",
+          "type": "contains_all",
+          "values": [
+            "descriptive job",
+            "runbook",
+            "never place secret values",
+            "sensitive production data"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Review a publish step that uses `if: ${{ secrets.PUBLISH_TOKEN != '' }}` and runs `./publish.sh \"${{ inputs.version }}\"`. Correct the secret condition and script-injection boundary without changing the workflow's purpose.",
+      "expected_output": "Secrets cannot be referenced directly in if conditions. Map PUBLISH_TOKEN from secrets.PUBLISH_TOKEN to a narrowly scoped job-level environment variable, then use the step condition `if: env.PUBLISH_TOKEN != ''`. GitHub expands inputs.version before the shell parses the script, so quotes do not prevent expression injection. Put inputs.version in step-level env as RELEASE_VERSION, validate it against the required version format, and call `./publish.sh \"$RELEASE_VERSION\"`.",
+      "files": [],
+      "checks": [
+        {
+          "id": "corrects-secret-condition",
+          "type": "contains_all",
+          "values": [
+            "cannot be referenced directly",
+            "job-level environment variable",
+            "if: env.PUBLISH_TOKEN != ''"
+          ]
+        },
+        {
+          "id": "corrects-publish-input-boundary",
+          "type": "contains_all",
+          "values": [
+            "expands inputs.version before",
+            "quotes do not prevent expression injection",
+            "step-level env",
+            "RELEASE_VERSION",
+            "\"$RELEASE_VERSION\""
+          ]
+        },
+        {
+          "id": "validates-version-input",
+          "type": "contains_all",
+          "values": [
+            "validate",
+            "version format"
+          ]
+        }
+      ]
     }
   ]
 }

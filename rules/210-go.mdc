@@ -1552,6 +1552,26 @@ func BenchmarkNewImplementation(b *testing.B) {
 }
 ```
 
+### Code Quality Signals
+
+- `golangci-lint` is the primary aggregated Go lint gate. Pin its version and
+  commit an explicit configuration so enabled linters and exclusions are
+  reviewable and reproducible.
+- Full CI runs SHOULD set `issues.max-issues-per-linter: 0` and
+  `issues.max-same-issues: 0` so diagnostics are not truncated. These settings
+  control reporting volume, not code quality.
+- A single grade or numeric quality score MUST NOT replace `gofmt`, `go vet`,
+  `golangci-lint`, `go test -race`, coverage evidence, or `govulncheck`.
+- Function-level CRAP analysis MAY be used to prioritize risky combinations of
+  complexity and low test coverage. Treat it as a hotspot signal with a
+  documented threshold, not as proof of correctness.
+- Do not add suppressions, exclusions, generated-code markers, or weaker
+  thresholds solely to improve a score. Every exception needs a narrow scope
+  and rationale.
+- Do not recommend the retired hosted Go Report Card service. Experimental
+  composite scorers such as `gocode-score` and `codescore` are advisory only
+  and are not default CI dependencies.
+
 ### CI Gates (Non-Negotiable)
 
 ```bash

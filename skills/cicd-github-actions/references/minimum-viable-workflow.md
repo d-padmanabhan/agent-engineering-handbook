@@ -8,23 +8,24 @@ elements (`permissions: {}`, `concurrency:`, `timeout-minutes:`).
 ## The workflow
 
 ```yaml
-###############################################################################
-# Build & publish for <project-name>.
+name: <project>-Build and Publish
+
+# ================================================================
+# Purpose: Builds, scans, publishes, and verifies the project artifact
 #
 # Triggers:
-#   - push to main with changes under <source-path>/**
-#   - workflow_dispatch (manual)
+#   - Push to main under <source-path>/**
+#   - Manual workflow dispatch
 #
-# What it does:
-#   1. Builds the artifact (image, package, binary)
-#   2. Scans the artifact (Wiz, Trivy, npm audit, etc.)
-#   3. Publishes the artifact (registry, release, S3)
-#   4. Verifies the artifact landed where expected
+# Required Secrets:
+#   - None: cloud and registry authentication use OIDC
 #
-# Required secrets (org or repo level):
-#   - <SECRET_NAME>: <what it is for>
-###############################################################################
-name: <project>-Build and Publish
+# Dependencies:
+#   - Package registry
+#   - Configured vulnerability scanner
+#   - Protected GitHub Environment when publication requires approval
+#   - Release rollback runbook
+# ================================================================
 
 run-name: Build & Publish - ${{ github.ref_name }}
 
@@ -63,7 +64,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate version
         id: version
@@ -79,11 +80,13 @@ jobs:
 
       - name: Display build summary
         if: always()
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.semver }}
         run: |
           {
             echo "## Build & Publish complete"
             echo ""
-            echo "**Version:** \`${{ steps.version.outputs.semver }}\`"
+            printf '**Version:** `%s`\n' "$BUILD_VERSION"
           } >> "$GITHUB_STEP_SUMMARY"
 ```
 
@@ -93,6 +96,7 @@ Each line below is satisfied by something in the template above:
 
 | Checklist item | Line / block |
 | --- | --- |
+| Bordered documentation after `name:` | Operational comment block at the top |
 | `permissions: {}` at workflow root | `permissions: {}` near the top |
 | Job-level permissions (least privilege) | `permissions:` inside `build-and-publish` |
 | Concurrency control configured | `concurrency:` block |
@@ -100,29 +104,28 @@ Each line below is satisfied by something in the template above:
 | Secrets never logged | `env:` is for non-secret config; secrets reach steps via step-level `env:` |
 | `set -euo pipefail` in shells | Inside `run: \|` for any multi-line block |
 | Env vars quoted: `"$GITHUB_OUTPUT"` | Used everywhere |
-| Caching for dependencies | Add `cache:` to setup-node / setup-python / etc. |
+| Caching for dependencies when beneficial | Add `cache:` to the relevant setup action |
 | PR workflows use `pull_request` not `pull_request_target` | Default to `pull_request` |
 
 ## Current public action versions
 
-Verified 2026-05-15. Major versions are mutable, so periodically refresh
-with `pre-commit autoupdate` or by checking each action's
-`/releases/latest` page.
+Verified 2026-09-26. Major versions are mutable, so verify the latest stable
+release and published major alias before each change.
 
 | Action | Latest major | Notes |
 | --- | --- | --- |
-| `actions/checkout` | `v6` | v6 changes credential persistence (uses `$RUNNER_TEMP`); requires Actions Runner v2.329.0+ for Docker container actions |
-| `actions/setup-node` | `v6` | Auto-cache when `devEngines.packageManager` or `packageManager` set; `always-auth` removed |
-| `actions/setup-python` | `v6` | (verify before bumping) |
-| `actions/cache` | `v4` | |
+| `actions/checkout` | `v7` | Review release notes and runner compatibility before upgrading |
+| `actions/setup-node` | `v7` | Review runtime and automatic cache behavior |
+| `actions/setup-python` | `v7` | Review runtime and dependency cache behavior |
+| `actions/cache` | `v6` | Cache only reproducible, non-sensitive state |
 | `actions/upload-artifact` | `v7` | v7 supports `archive: false` for unzipped single-file uploads; multi-file globs now fail without `archive: false` |
-| `actions/download-artifact` | `v6` | (verify before bumping) |
-| `actions/github-script` | `v7` | |
+| `actions/download-artifact` | `v8` | Validate downloaded artifacts before privileged use |
+| `actions/github-script` | `v9` | Keep untrusted expressions out of generated JavaScript |
 | `jfrog/setup-jfrog-cli` | `v5` | v5 default runtime is Node 24; v4.10.x stays on Node 20 if runner is older |
-| `hashicorp/vault-action` | `v3.4.0` | v4.0.0 (May 2026) requires Node 24; pin to v3.4.0 for older runners |
-| `aws-actions/configure-aws-credentials` | `v4` | |
-| `docker/setup-buildx-action` | `v3` | |
-| `docker/build-push-action` | `v6` | |
+| `hashicorp/vault-action` | `v4` | Verify runner compatibility before upgrading |
+| `aws-actions/configure-aws-credentials` | `v6` | Use job-scoped OIDC |
+| `docker/setup-buildx-action` | `v4` | |
+| `docker/build-push-action` | `v7` | |
 
 Refresh procedure:
 
@@ -142,13 +145,13 @@ rg "uses: actions/" .github/workflows/                 # find what is in use
 
 ### Node application
 
-- Add `actions/setup-node@v6` with `cache: 'npm'` and `cache-dependency-path: package-lock.json`
+- Add `actions/setup-node@v7` with `cache: 'npm'` and `cache-dependency-path: package-lock.json`
 - Add `npm ci`
 - Add `npm test` (for CI) or skip in build-and-publish if a separate test job exists
 
 ### Go binary
 
-- Add `actions/setup-go@v5`
+- Add `actions/setup-go@v7`
 - Cache via `setup-go`'s built-in cache
 - `CGO_ENABLED=0 GOOS=linux go build`
 

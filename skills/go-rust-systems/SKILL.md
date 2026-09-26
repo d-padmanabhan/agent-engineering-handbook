@@ -29,6 +29,33 @@ golangci-lint run            # Run all linters
 govulncheck ./...            # Check vulnerabilities
 ```
 
+### Go Code Quality Signals
+
+Use `golangci-lint` as the primary aggregated lint gate. Pin its version, commit
+its configuration, and enable linters deliberately. For full CI diagnostics,
+disable the default output caps:
+
+```yaml
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+```
+
+The caps affect how many findings are displayed; they are not quality
+thresholds. A clean run complements rather than replaces `gofmt`, `go vet`,
+`go test -race`, coverage evidence, and `govulncheck`.
+
+Use function-level CRAP analysis only when complexity plus low coverage would
+help prioritize test and refactoring work. Configure a reviewed threshold and
+treat the result as a hotspot signal, not a project health score or correctness
+proof.
+
+Do not use a single letter grade or `/100` score as a required quality gate.
+The hosted Go Report Card service is retired. `gocode-score` and `codescore`
+are experimental advisory tools with limited adoption, so do not add them by
+default. Never weaken checks or add unjustified suppressions merely to improve
+a score.
+
 ### Critical Patterns
 
 ```go

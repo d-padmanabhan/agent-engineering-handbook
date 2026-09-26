@@ -89,6 +89,13 @@ inherit destructive authority over an old external resource.
 Detailed runtime guidance:
 `${HANDBOOK_ROOT}/skills/kubernetes-operator-development/references/reconciliation-runtime.md`.
 
+Use controller-runtime's managed cache and event pipeline for normal
+operators. Declare primary, owned, and dependency watches through the builder,
+with indexes, mapping functions, and predicates where needed. Do not implement
+a raw Kubernetes `Watch` loop or copy a short global resync interval as a
+substitute for complete event sources and level-based convergence. Use
+client-go shared informers directly only for a documented lower-level need.
+
 ## API and Lifecycle
 
 - Use `apiextensions.k8s.io/v1` structural schemas and prune unknown fields.

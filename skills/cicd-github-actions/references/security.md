@@ -27,19 +27,19 @@ jobs:
 
 ```yaml
 # AWS
-- uses: aws-actions/configure-aws-credentials@v4
+- uses: aws-actions/configure-aws-credentials@v6
   with:
     role-to-assume: arn:aws:iam::123456789:role/github-actions
     aws-region: us-east-1
 
 # GCP
-- uses: google-github-actions/auth@v2
+- uses: google-github-actions/auth@v3
   with:
     workload_identity_provider: projects/123/locations/global/workloadIdentityPools/github/providers/github
     service_account: github-actions@project.iam.gserviceaccount.com
 
 # Azure
-- uses: azure/login@v1
+- uses: azure/login@v3
   with:
     client-id: ${{ secrets.AZURE_CLIENT_ID }}
     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -58,7 +58,7 @@ jobs:
     ./deploy.sh
 
 # Never in artifact
-- uses: actions/upload-artifact@v4
+- uses: actions/upload-artifact@v7
   with:
     name: build
     path: |
@@ -67,6 +67,20 @@ jobs:
 ```
 
 Prefer step-level secret scope. Do not persist secrets through `GITHUB_ENV` unless later steps genuinely need them, and never print a secret merely to mask it.
+
+Secrets cannot be referenced directly in `if:`. Map the secret at job scope,
+then test the `env` context on the step:
+
+```yaml
+jobs:
+  publish:
+    env:
+      PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+    steps:
+      - name: Publish when credentials are available
+        if: env.PUBLISH_TOKEN != ''
+        run: ./scripts/publish.sh
+```
 
 ## Untrusted Contexts and Inputs
 
@@ -87,16 +101,10 @@ Apply the same pattern to issue bodies, commit messages, branch names, dispatch 
 
 ## Third-Party Actions
 
-```yaml
-# Pin to specific SHA (most secure)
-- uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-
-# Or pin to major version (reasonable balance)
-- uses: actions/checkout@v4
-
-# Never use @master or @main
-# - uses: some-action@main  # BAD
-```
+Default to the verified latest stable major alias, such as
+`actions/checkout@v7`. If the user explicitly requests an exact stable tag or
+immutable commit SHA, verify and use that requested mode. Never use `@main`,
+`@master`, `@latest`, an invented tag, or an unverified alias.
 
 ## Branch Protection
 
@@ -143,43 +151,51 @@ Use GitHub-hosted runners by default when the workload does not require private 
 
 ## Dependency Review
 
-```yaml
-name: Dependency Review
-
-on: pull_request
-
-permissions:
-  contents: read
-  pull-requests: write
-
-jobs:
-  dependency-review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: moderate
-```
+Use the repository's approved dependency-review integration and fail on the
+configured severity policy. Verify that its latest stable release publishes the
+required major alias before adding a `uses:` reference. Stop and report when
+the latest release has no verifiable major alias instead of inventing one or
+silently selecting an older major.
 
 ## Secret Scanning
 
 ```yaml
 name: Security Scan
 
+# ================================================================
+# Purpose: Scans repository history for committed secrets
+#
+# Triggers:
+#   - Push to main
+#   - Pull requests
+#
+# Required Secrets:
+#   - None
+#
+# Dependencies:
+#   - Complete repository history
+#   - Approved secret-scanning action
+# ================================================================
+
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions: {}
+
 jobs:
   secrets:
+    name: Scan secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -195,7 +211,7 @@ jobs:
     output-file: sbom.json
 
 - name: Scan for vulnerabilities
-  uses: anchore/scan-action@v3
+  uses: anchore/scan-action@v7
   with:
     sbom: sbom.json
     fail-build: true

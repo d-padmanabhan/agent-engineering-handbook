@@ -35,7 +35,7 @@ Hook scripts communicate via JSON over stdio (stdin input, stdout output). Curso
 Behavior:
 
 - **deny**: clearly destructive commands that are almost never correct to run autonomously (example: `rm -rf /`)
-- **ask**: commits, worktree-discard operations, remote writes, image publishing/signing, and high-blast-radius commands (examples: `git commit`, `git push`, `docker push`, `cosign sign`, `terraform apply`)
+- **ask**: commits, worktree creation/removal/discard operations, remote writes, image publishing/signing, and high-blast-radius commands (examples: `git commit`, `git worktree add`, `phantom create`, `git push`, `docker push`, `cosign sign`, `terraform apply`)
 - **allow**: everything else
 
 ### 2) File read guard (`beforeReadFile`)

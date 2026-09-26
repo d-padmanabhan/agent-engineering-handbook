@@ -20,7 +20,7 @@ Use this skill for Git procedures. Mandatory authorization and preservation gate
 
 2. Use the quoted `GIT_REPO_ROOT` variable for repository-relative paths and artifacts. Never derive the root from `pwd` or a workspace assumption.
 3. Preserve unrelated user changes. Never discard, stash, rewrite, or relocate them merely to simplify the task.
-4. Treat commit, push, force update, history rewrite, restore/discard, destructive branch deletion, and worktree removal as separate authorization boundaries.
+4. Treat commit, push, force update, history rewrite, restore/discard, worktree creation, worktree removal, and destructive branch deletion as separate authorization boundaries. Never create a worktree without explicit HITL approval of the exact repository, path, branch, base ref, and command.
 5. Run applicable tests, lint, formatting, type checks, and build steps before proposing a commit.
 6. Before committing, show the complete message and exact file list, then wait for explicit confirmation.
 7. Respect repository signing policy. If signing fails, stop; never silently create an unsigned commit.
@@ -41,14 +41,22 @@ git pull --ff-only
 git switch -c feat/your-feature
 ```
 
-When the current worktree has unrelated changes, preserve it and create an isolated worktree:
+When the current worktree has unrelated changes, preserve it. If an isolated
+worktree is proposed, show the exact repository, destination path, branch, base
+ref, and command, then wait for explicit HITL approval:
 
 ```bash
 git fetch origin --prune
 git worktree add -b feat/your-feature ../project-your-feature origin/main
 ```
 
-Do not use `git switch -c` in a dirty worktree: compatible uncommitted changes can follow the new branch.
+The command above is a preview, not authorization to execute it. A request to
+implement, create a branch, parallelize work, or preserve unrelated changes
+does not authorize worktree creation.
+
+Do not use `git switch -c` in a dirty worktree: compatible uncommitted changes
+can follow the new branch. Do not create a replacement worktree unless the
+human explicitly approves it.
 
 ### Prepare a commit
 

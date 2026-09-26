@@ -354,6 +354,67 @@
           ]
         }
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "A controller-runtime operator manually calls the Kubernetes Watch API for Secrets and restarts the watch after errors. A teammate proposes replacing it with a client-go SharedInformerFactory configured with a five-second resync. Give the smallest production-safe design correction.",
+      "expected_output": "For a normal controller-runtime operator, use the Manager and managed informer cache. Declare the primary resource with For, owned resources with Owns, and Secret dependencies with Watches, a field index, and a mapping function; use predicates only when they preserve required recovery events. Do not maintain a raw Watch loop because correct list-watch handling includes resource versions, expired history, reconnects, backoff, relisting, duplicates, and shutdown. Use client-go SharedInformerFactory directly only for a documented lower-level need, with lifecycle ownership and cache-sync checks. Do not copy a five-second global resync as a correctness mechanism. Prefer dependency watches for changes and a bounded resource-specific RequeueAfter for drift; configure global resync only for a measured documented need.",
+      "files": [],
+      "checks": [
+        {
+          "id": "uses-controller-runtime-managed-events",
+          "type": "contains_all",
+          "values": [
+            "Manager",
+            "managed informer cache",
+            "For",
+            "Owns",
+            "Watches"
+          ]
+        },
+        {
+          "id": "maps-secret-dependencies",
+          "type": "contains_all",
+          "values": [
+            "Secret",
+            "field index",
+            "mapping function",
+            "predicates"
+          ]
+        },
+        {
+          "id": "rejects-raw-watch-loop",
+          "type": "contains_all",
+          "values": [
+            "Do not maintain a raw Watch loop",
+            "resource versions",
+            "expired history",
+            "relisting",
+            "shutdown"
+          ]
+        },
+        {
+          "id": "limits-direct-shared-informers",
+          "type": "contains_all",
+          "values": [
+            "SharedInformerFactory",
+            "documented lower-level need",
+            "lifecycle ownership",
+            "cache-sync"
+          ]
+        },
+        {
+          "id": "rejects-short-resync-as-correctness",
+          "type": "contains_all",
+          "values": [
+            "Do not copy",
+            "five-second global resync",
+            "correctness mechanism",
+            "RequeueAfter",
+            "measured documented need"
+          ]
+        }
+      ]
     }
   ]
 }

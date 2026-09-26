@@ -22,6 +22,7 @@ This rule contains only mandatory policy. Use the Git workflow skill (`${HANDBOO
   - `git reset --hard`
   - `git clean -f`
 - Do not stash user work merely to simplify the agent's workflow. Use a stash only when the operation genuinely requires a clean tree, explain its contents, and restore it promptly.
+- Never create a Git worktree unless a human explicitly approves that exact creation after reviewing the repository, destination path, branch, base ref, and command. A request to implement, branch, parallelize, or preserve a dirty worktree is not approval to run `git worktree add`, Phantom worktree creation, or an equivalent tool.
 - Do not delete branches, remove worktrees, or rewrite shared history without explicit authorization.
 
 The broader checkpoint, verification, remote-mutation, and audit policy is canonical in 020-agent-audit.mdc (`${HANDBOOK_ROOT}/rules/020-agent-audit.mdc`).
@@ -63,8 +64,8 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 
 ## Branches, History, and Remote Writes
 
-- Refresh the remote before creating a feature branch. Use a clean updated default branch or create an isolated worktree directly from the refreshed remote base.
-- Do not use `git switch -c` in a dirty worktree when unrelated changes must remain in place; use `git worktree add -b ... origin/main`.
+- Refresh the remote before creating a feature branch. Use a clean updated default branch. If isolation requires a new worktree, preview the exact worktree creation and wait for explicit HITL approval.
+- Do not use `git switch -c` in a dirty worktree when unrelated changes must remain in place. Do not create a replacement worktree without the separate approval required above.
 - Treat rebase, reset, branch deletion, worktree removal, and conflict resolution as distinct operations with distinct risks.
 - Remote writes require authorization. A request to push authorizes only the described push, not a force update, tag push, or another remote mutation.
 - Immediately before an authorized push, run `git fetch origin --prune` and inspect status plus upstream divergence.

@@ -350,9 +350,21 @@ def mutating_git_command(segment: list[str]) -> bool:
         or (subcommand == "checkout" and "--" in arguments)
         or (subcommand == "reset" and "--hard" in arguments)
         or (subcommand == "branch" and any(argument in {"-d", "-D", "--delete"} for argument in arguments))
-        or (subcommand == "worktree" and "remove" in arguments)
+        or (subcommand == "worktree" and any(action in arguments for action in {"add", "remove"}))
         or forced_clean
     )
+
+
+def worktree_manager_creation(segment: list[str]) -> bool:
+    """Detect worktree creation through a supported wrapper.
+
+    Args:
+        segment: One parsed command segment.
+
+    Returns:
+        ``True`` when explicit worktree-creation approval is required.
+    """
+    return bool(segment) and Path(segment[0]).name == "phantom" and "create" in segment[1:]
 
 
 def force_git_push(segment: list[str]) -> bool:
@@ -491,6 +503,7 @@ def evaluate_command(command: str, recursion_depth: int = 0) -> Decision:
         is_mutation: bool = (
             is_force_push
             or mutating_git_command(segment)
+            or worktree_manager_creation(segment)
             or mutating_gh_command(segment)
             or contains_mutating_sequence(segment)
         )

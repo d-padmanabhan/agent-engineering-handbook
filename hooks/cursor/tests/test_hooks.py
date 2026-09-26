@@ -61,8 +61,13 @@ class ShellGuardTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_permission(command, "ask")
 
-    def test_destructive_git_branch_and_worktree_commands_require_approval(self) -> None:
-        for command in ("git branch -D feat/old", "git worktree remove ../old-worktree"):
+    def test_git_branch_and_worktree_mutations_require_approval(self) -> None:
+        for command in (
+            "git branch -D feat/old",
+            "git worktree add -b feat/new ../new-worktree origin/main",
+            "git worktree remove ../old-worktree",
+            "phantom create feat/new",
+        ):
             with self.subTest(command=command):
                 self.assert_permission(command, "ask")
 
@@ -72,6 +77,8 @@ class ShellGuardTests(unittest.TestCase):
             "git diff",
             "git fetch origin --prune",
             "git log --oneline",
+            "git worktree list",
+            "phantom list",
         ):
             with self.subTest(command=command):
                 self.assert_permission(command, "allow")

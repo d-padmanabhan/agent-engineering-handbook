@@ -16,7 +16,7 @@ permissions:
 
 ```yaml
 # Check cache key matches exactly
-- uses: actions/cache@v4
+- uses: actions/cache@v6
   with:
     path: ~/.npm
     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -96,7 +96,7 @@ Interactive debug shells expand the runner's exposure and may reveal credentials
 
 ```yaml
 # Use shallow clone
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
   with:
     fetch-depth: 1
 ```
@@ -106,7 +106,7 @@ Interactive debug shells expand the runner's exposure and may reveal credentials
 ```yaml
 # Compress before upload
 - run: tar -czf build.tar.gz dist/
-- uses: actions/upload-artifact@v4
+- uses: actions/upload-artifact@v7
   with:
     name: build
     path: build.tar.gz
@@ -118,11 +118,15 @@ Interactive debug shells expand the runner's exposure and may reveal credentials
 ```yaml
 jobs:
   test:
+    timeout-minutes: 30
     strategy:
       matrix:
         shard: [1, 2, 3, 4]
     steps:
-      - run: npm test -- --shard=${{ matrix.shard }}/4
+      - name: Run test shard
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
+        run: npm test -- --shard="$TEST_SHARD"/4
 ```
 
 ## Error Handling
@@ -143,7 +147,7 @@ jobs:
 
 ```yaml
 - name: Retry on failure
-  uses: nick-fields/retry@v2
+  uses: nick-fields/retry@v4
   with:
     timeout_minutes: 10
     max_attempts: 3
@@ -178,6 +182,7 @@ jobs:
     echo "Line 2"
 
 # Correct quoting
-- run: |
-    echo "Value: ${{ env.MY_VAR }}"
+- env:
+    MY_VAR: ${{ github.event.pull_request.title }}
+  run: printf 'Value: %s\n' "$MY_VAR"
 ```
