@@ -86,7 +86,7 @@ Document the choice in the zone's README / runbook so the next on-call doesn't a
    | `block-non-trusted-egress-ips` family | `block` action + host + path scope + `not (ip.src in $trusted_egress_ips)` | Internal-only endpoint must be reachable only from trusted egress |
    | `allow-us-only-and-trusted` family | `skip` action with high-priority allow + `(ip.geoip.country eq "US" or ip.src in $trusted_egress_ips)` + host scope | Geo-restricted public-ish endpoint |
    | `allow-<region>-and-trusted` (e.g., US+CA, TW) | Same as above with extra country + trusted-IPs escape hatch | Targeted regional rollouts; always add trusted IPs as escape hatch |
-   | `geo-block-OFAC` (continent or country list) | `block` action + `ip.geoip.country in {"CU" "IR" "KP" "RU" "SY"}` | OFAC sanctioned countries; never user-configurable, always block |
+   | `geo-block-OFAC` (continent or country list) | `block` action + `ip.geoip.country in {"CU" "IR" "KP" "RU"}` | OFAC sanctioned countries; never user-configurable, always block |
    | `attack-score-gate` (Enterprise) | `cf.waf.score le N` scoped to host/path | Sensitive paths; supplements managed rules, doesn't replace them |
 
    For new custom rules: prefer **allow before block** (skip-allow rule positioned above the block rule) so the trusted-egress escape hatch always wins ties.
@@ -166,7 +166,7 @@ Every skip rule MUST include the guards in its row, plus the standard host + met
 | Custom rule type | Required guards |
 |---|---|
 | **Geo allowlist (block-by-default)** | Country / continent predicate AND trusted-egress escape hatch (`ip.src in $trusted_egress_ips`). Never block based purely on geo - internal users travel. |
-| **OFAC / sanctioned-country block** | `ip.geoip.country in {"CU" "IR" "KP" "RU" "SY"}` (literal list, never variable). No escape hatch - this is a compliance block, not a policy choice. |
+| **OFAC / sanctioned-country block** | `ip.geoip.country in {"CU" "IR" "KP" "RU"}` (literal list, never variable). No escape hatch - this is a compliance block, not a policy choice. |
 | **Endpoint allowlist (specific path → specific source)** | host eq + path predicate (eq / starts_with per matrix) + source predicate (trusted IPs, named source set, or geo). Use `skip` action positioned above the deny rule. |
 | **Attack-score gate (Enterprise plan)** | host + path scope + `cf.waf.score le N` (per `400-cloudflare.mdc` § "WAF Attack Score (Plan-Aware)"). Never gate globally on raw score; always combine with host / path / method. |
 | **Bot / ASN block** | `ip.geoip.asnum in {<list>}` OR `cf.client.bot` predicate. Document the ASN owner and the incident that justified the block. |
