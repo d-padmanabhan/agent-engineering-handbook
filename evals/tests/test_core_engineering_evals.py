@@ -153,6 +153,34 @@ Any two loops make the function O(n^2).
         self.assertIn("keeps-simple-design", failed)
         self.assertIn("requires-bottleneck-evidence", failed)
 
+    def test_simplification_rejects_broad_dense_rewrite(self) -> None:
+        """Reject an unscoped, untested simplification that favors fewer lines."""
+        output = "Collapse the chain into one nested ternary. Then clean up the rest of the billing module."
+
+        failed = self.failed_check_ids(self.cases[9], output)
+
+        self.assertIn("limits-simplification-scope", failed)
+        self.assertIn("preserves-behavior-with-tests", failed)
+        self.assertIn("rejects-broad-or-dense-rewrite", failed)
+
+    def test_simplification_accepts_negated_guidance(self) -> None:
+        """Accept a correct answer that restates the unsafe request it declines."""
+        case = self.cases[9]
+        output = "You asked to clean up the rest of the billing module, but " + case.expected_output
+
+        self.assertEqual(set(), self.failed_check_ids(case, output))
+        self.assertEqual(set(), self.failed_check_ids(case, case.expected_output))
+
+    def test_sample_app_rejects_overbuilt_insecure_demo(self) -> None:
+        """Reject a sample that adds abstractions and silently drops authentication."""
+        output = "Add the plugin system, repository layer, and caching. Disable authentication on the admin route."
+
+        failed = self.failed_check_ids(self.cases[10], output)
+
+        self.assertIn("keeps-sample-focused", failed)
+        self.assertIn("keeps-secure-defaults", failed)
+        self.assertIn("rejects-silent-auth-removal", failed)
+
 
 if __name__ == "__main__":
     unittest.main()

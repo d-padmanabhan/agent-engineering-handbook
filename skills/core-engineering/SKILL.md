@@ -32,7 +32,35 @@ Treat "clean code" as observable outcomes, not as an appeal to a particular book
 
 Small code is not automatically simple code. When domain complexity is unavoidable, isolate it, document the reason, test the behavior, and keep it from spreading into unrelated components.
 
+Write code that is impossible to misunderstand. The test: a competent engineer new to the code can tell what it does, why it does it, and how to change it safely, without asking the author.
+
 Clean, cohesive, predictable code is also cheaper and safer for AI agents to read and modify: it reduces the context that must be loaded, lowers navigation and inference cost, and makes targeted changes less likely to affect unrelated behavior. Optimize for clarity, locality, explicit interfaces, and discoverable structure - not token count alone. Compressed code, excessive indirection, fragmented abstractions, and redundant documentation can increase agent cost even when individual files are short.
+
+## Simplification Pass (On Request)
+
+When the user asks to simplify, clean up, or refine code, including through Cursor's built-in `code-simplifier` subagent, run a behavior-preserving pass:
+
+- Run it only when requested, and limit scope to code changed in the current task or paths the user names. Refactoring other code needs a separate request.
+- Preserve behavior exactly: outputs, side effects, errors, public interfaces, and performance characteristics. Run existing tests before and after; when coverage is missing, add a characterization test first.
+- Reduce nesting with guard clauses, remove redundant code and indirection, consolidate duplicated logic, and improve names.
+- Prefer clarity over brevity: use `if`/`else` or `switch`/`match` instead of nested ternaries, and split dense one-liners.
+- Keep abstractions that improve organization or testability, and do not merge unrelated concerns.
+- Follow repository conventions and the relevant language skill rather than a generic house style.
+- Remove comments that only restate code; keep comments that explain intent or constraints.
+- Report what changed and how behavior preservation was verified.
+
+## Sample and Reference Applications
+
+A sample application exists to teach. Optimize it for the reader learning from it, not for feature coverage:
+
+- Demonstrate one concept, or a small connected set, with the fewest dependencies and files that show it faithfully.
+- Prefer explicit, linear code over abstractions; a reader should follow the main path from entry point to result in one sitting.
+- Provide a runnable quickstart with pinned versions, and verify it works exactly as written.
+- Keep secure defaults. When a shortcut is unsafe for production, such as disabled authentication or a local-only secret, label it in the code and the README and state what production requires instead.
+- Use comments to explain why a step exists and what to change for real use, not to narrate each line.
+- Use synthetic `acme.com` data and never real credentials.
+
+Follow the documentation standards skill (`${HANDBOOK_ROOT}/skills/documentation-standards/SKILL.md`) for the README.
 
 ## Priority Framework
 
