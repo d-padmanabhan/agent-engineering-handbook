@@ -378,7 +378,7 @@ XAA makes the **IdP the broker** - admins configure which apps can talk to which
    has an ID token + session.
 
 2. Requesting App needs Resource App's API. It sends an Identity
-   Assertion request to Okta (RFC 8693 token exchange):
+   Assertion request to Okta:
      "I am Requesting App. User X is active. I want to call
       Resource App with scope Y."
 
@@ -395,7 +395,7 @@ XAA makes the **IdP the broker** - admins configure which apps can talk to which
      - short TTL (typically 5 minutes)
 
 5. Requesting App posts the ID-JAG to Resource App's token
-   endpoint (RFC 7523 JWT bearer grant).
+   endpoint (RFC 8693 token exchange).
 
 6. Resource App validates: signature against Okta JWKS, aud is
    itself, trust relationship configured, user has corresponding
@@ -454,7 +454,7 @@ These are complementary. MCP is the agent's tool interface, A2A is agent-to-agen
 ### Implementation notes
 
 - **Requesting App** typically uses the Auth0 SDK (Node, Python, Go) for token exchange. Build it from scratch only if no SDK exists.
-- **Resource App** must publish a token endpoint that accepts the ID-JAG as an RFC 7523 JWT bearer grant (`urn:ietf:params:oauth:grant-type:jwt-bearer`). Token exchange (`urn:ietf:params:oauth:grant-type:token-exchange`) is the step before, where the Requesting App gets the ID-JAG from the IdP.
+- **Resource App** must publish a token endpoint that accepts ID-JAG via RFC 8693 grant type `urn:ietf:params:oauth:grant-type:token-exchange`.
 - **Admin setup in Okta**: Requesting App and Resource App both pre-registered; trust relationship and scope mapping configured by IT, not the user.
 - **Conditional Access** policies still apply (device posture, network zone, MFA freshness).
 
