@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 
-This repository contains 52 Cursor rule files, 56 Agent Skills, 19 custom Cursor commands, and 34 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
+This repository contains 52 Cursor rule files, 80 Agent Skills, 19 custom Cursor commands, and 34 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
 
 The content is organized for progressive disclosure:
 
@@ -367,7 +367,7 @@ The repository currently contains 52 `.mdc` rule files. The following list highl
 
 ## Skill Catalog
 
-The repository currently contains 56 skill packages. Each directory listed below contains a `SKILL.md`.
+The repository currently contains 80 skill packages. Each directory listed below contains a `SKILL.md`.
 
 ### Engineering and Languages
 
@@ -416,6 +416,35 @@ The repository currently contains 56 skill packages. Each directory listed below
 - [Sandbox SDK](skills/sandbox-sdk/)
 - [Workers best practices](skills/workers-best-practices/)
 - [Wrangler](skills/wrangler/)
+
+### AWS (Installer-Managed)
+
+An AWS skills installer adds and updates these skills through the `~/.cursor/skills` link, so local edits can be overwritten by the next installer update.
+
+- [Amazon Bedrock](skills/amazon-bedrock/)
+- [Amazon EC2 compute](skills/aws-compute/)
+- [AWS AI/ML model customization](skills/aws-ai-ml/)
+- [AWS Auth (Amazon Cognito)](skills/aws-auth/)
+- [AWS Billing and Cost Management](skills/aws-billing-and-cost-management/)
+- [AWS Blocks](skills/aws-blocks/)
+- [AWS CDK](skills/aws-cdk/)
+- [AWS CloudFormation](skills/aws-cloudformation/)
+- [AWS containers](skills/aws-containers/)
+- [AWS databases](skills/aws-database/)
+- [AWS deployment (CI/CD)](skills/aws-deployment/)
+- [AWS investigation](skills/aws-investigation/)
+- [AWS messaging and streaming](skills/aws-messaging-and-streaming/)
+- [AWS networking](skills/aws-networking/)
+- [AWS observability](skills/aws-observability/)
+- [AWS SDK for JavaScript v3](skills/aws-sdk-js-v3-usage/)
+- [AWS SDK for Python (Boto3)](skills/aws-sdk-python-usage/)
+- [AWS SDK for Swift](skills/aws-sdk-swift-usage/)
+- [AWS security](skills/aws-security/)
+- [AWS serverless](skills/aws-serverless/)
+- [AWS storage](skills/aws-storage/)
+- [AWS Well-Architected review](skills/aws-well-architected-review/)
+- [Launch with AWS](skills/launch-with-aws/)
+- [Signing in to AWS](skills/signing-in-to-aws/)
 
 ### Data Engineering
 
