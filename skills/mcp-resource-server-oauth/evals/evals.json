@@ -1,0 +1,302 @@
+{
+  "skill_name": "mcp-resource-server-oauth",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our remote MCP endpoint is https://mcp.acme.com/platform/mcp/v1. Design RFC 9728 discovery and state which transport routes receive authentication.",
+      "expected_output": "Use the Streamable HTTP endpoint as the default and authenticate every supported method before transport dispatch. Validate Origin when present and return 403 for an invalid origin. Publish path-derived metadata at https://mcp.acme.com/.well-known/oauth-protected-resource/platform/mcp/v1, preserving the complete resource path, and optionally publish the root fallback. The document must contain the exact resource and at least one authorization_servers entry. Treat HTTP+SSE as explicitly enabled legacy compatibility only.",
+      "files": [],
+      "checks": [
+        {
+          "id": "uses-streamable-http",
+          "type": "contains_all",
+          "values": [
+            "Streamable HTTP",
+            "every supported method",
+            "before transport"
+          ]
+        },
+        {
+          "id": "preserves-complete-resource-path",
+          "type": "contains_all",
+          "values": [
+            "https://mcp.acme.com/.well-known/oauth-protected-resource/platform/mcp/v1",
+            "complete resource path",
+            "root fallback"
+          ]
+        },
+        {
+          "id": "validates-streamable-http-origin",
+          "type": "contains_all",
+          "values": [
+            "Validate Origin",
+            "403",
+            "invalid origin"
+          ]
+        },
+        {
+          "id": "rejects-host-as-origin-substitute",
+          "type": "not_regex",
+          "pattern": "(trust|use|rely).{0,30}Host.{0,50}(instead|rather).{0,30}Origin|(skip|disable|omit|ignore).{0,30}Origin"
+        },
+        {
+          "id": "publishes-required-metadata",
+          "type": "contains_all",
+          "values": [
+            "exact resource",
+            "authorization_servers"
+          ]
+        },
+        {
+          "id": "requires-authorization-servers",
+          "type": "not_regex",
+          "pattern": "authorization_servers.{0,40}(optional|omit|not required|unnecessary)"
+        },
+        {
+          "id": "does-not-default-to-legacy-sse",
+          "type": "not_regex",
+          "pattern": "(default|primary).{0,30}(/mcp/sse|HTTP\\+SSE)"
+        },
+        {
+          "id": "observes-mcp-oauth-skill",
+          "type": "loaded_skill",
+          "skill": "mcp-resource-server-oauth",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Configure local JWT validation for an Okta-protected MCP server. The proposed implementation accepts a bare Okta-domain issuer and always fetches keys from issuer + '/v1/keys'. Review it.",
+      "expected_output": "Reject the proposal. Require an Okta custom authorization server for locally validated MCP access tokens and reject a bare-domain org authorization server issuer. For issuer https://acme.okta.com/oauth2/mcp, use RFC 8414 path insertion at https://acme.okta.com/.well-known/oauth-authorization-server/oauth2/mcp, verify its issuer exactly, and use the discovered jwks_uri rather than constructing a /v1/keys URL. Validate signature, algorithm, issuer, audience, exp, nbf, token purpose, and required scopes. Cache discovery and JWKS using Cache-Control and bound refresh on an unknown kid. Prevent DNS rebinding by validating A and AAAA results for every connection and redirect.",
+      "files": [],
+      "checks": [
+        {
+          "id": "requires-custom-authorization-server",
+          "type": "contains_all",
+          "values": [
+            "custom authorization server",
+            "reject",
+            "org authorization server"
+          ]
+        },
+        {
+          "id": "discovers-jwks",
+          "type": "contains_all",
+          "values": [
+            "RFC 8414",
+            "https://acme.okta.com/.well-known/oauth-authorization-server/oauth2/mcp",
+            "verify its issuer exactly",
+            "jwks_uri",
+            "rather than constructing"
+          ]
+        },
+        {
+          "id": "rejects-discovered-issuer-mismatch",
+          "type": "not_regex",
+          "pattern": "(accept|allow|trust|ignore).{0,50}(mismatch|different).{0,30}issuer|issuer.{0,30}(mismatch|different).{0,40}(accept|allow|ignore)"
+        },
+        {
+          "id": "validates-token-contract",
+          "type": "contains_all",
+          "values": [
+            "signature",
+            "algorithm",
+            "audience",
+            "exp",
+            "nbf",
+            "required scopes"
+          ]
+        },
+        {
+          "id": "bounds-key-refresh",
+          "type": "contains_all",
+          "values": [
+            "Cache-Control",
+            "bound",
+            "unknown kid"
+          ]
+        },
+        {
+          "id": "prevents-discovery-dns-rebinding",
+          "type": "contains_all",
+          "values": [
+            "DNS rebinding",
+            "A and AAAA",
+            "every connection",
+            "redirect"
+          ]
+        },
+        {
+          "id": "rejects-hardcoded-jwks-path",
+          "type": "not_regex",
+          "pattern": "(always|simply|just).{0,30}(append|fetch|use).{0,30}/v1/keys"
+        },
+        {
+          "id": "rejects-appended-rfc8414-discovery",
+          "type": "not_regex",
+          "pattern": "(use|fetch|request|construct|build|derive|recommend|append|concatenate).{0,100}(issuer\\s*\\+|issuer path.{0,30}/\\.well-known|/oauth2/[^\\s]+/\\.well-known/oauth-authorization-server|well-known discovery suffix.{0,30}(after|to).{0,20}issuer)|(issuer|issuer URL).{0,80}(append|concatenate).{0,60}(well-known|discovery suffix)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "For migration convenience, enable OAuth when issuer and audience exist, otherwise silently use MCP_API_KEY if present. Is that safe?",
+      "expected_output": "No. Use an explicit AUTH_MODE. When AUTH_MODE=oauth, validate all required OAuth configuration at startup and fail closed if any value is missing or invalid. Never infer API-key fallback from incomplete OAuth configuration. If a legacy API-key mode is temporarily authorized, select it explicitly, assign an owner and expiry, add telemetry and rate limits, and do not accept both modes implicitly.",
+      "files": [],
+      "checks": [
+        {
+          "id": "requires-explicit-auth-mode",
+          "type": "contains_all",
+          "values": [
+            "explicit AUTH_MODE",
+            "AUTH_MODE=oauth",
+            "startup"
+          ]
+        },
+        {
+          "id": "fails-closed",
+          "type": "contains_all",
+          "values": [
+            "fail closed",
+            "missing or invalid",
+            "Never infer API-key fallback"
+          ]
+        },
+        {
+          "id": "bounds-legacy-mode",
+          "type": "contains_all",
+          "values": [
+            "explicitly",
+            "owner",
+            "expiry",
+            "telemetry",
+            "rate limits"
+          ]
+        },
+        {
+          "id": "rejects-silent-fallback",
+          "type": "not_regex",
+          "pattern": "(silently|automatically).{0,30}(fall back|fallback).{0,20}(API|key)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "A token has a valid Okta signature, issuer, audience, and expiry but lacks the scope needed to execute the MCP start_job tool. What should the server do?",
+      "expected_output": "Authentication succeeds but authorization fails. Enforce the operation scope and then per-tool policy for caller, tool, resource, and action before side effects. Because this token lacks scope, return 403 Forbidden with a Bearer challenge containing error=\"insufficient_scope\", the required scope, and resource_metadata. If scopes are sufficient but independent tool policy denies access, return a generic 403 without insufficient_scope. Use 401 only for missing or invalid credentials; a malformed authorization request can return 400 Bad Request with invalid_request. Emit a redacted audit decision with a correlation identifier.",
+      "files": [],
+      "checks": [
+        {
+          "id": "separates-authentication-and-authorization",
+          "type": "contains_all",
+          "values": [
+            "Authentication succeeds",
+            "authorization fails",
+            "per-tool policy",
+            "before side effects"
+          ]
+        },
+        {
+          "id": "uses-insufficient-scope-response",
+          "type": "contains_all",
+          "values": [
+            "403 Forbidden",
+            "insufficient_scope",
+            "required scope",
+            "resource_metadata"
+          ]
+        },
+        {
+          "id": "distinguishes-policy-denial",
+          "type": "contains_all",
+          "values": [
+            "scopes are sufficient",
+            "tool policy denies",
+            "generic 403 without insufficient_scope"
+          ]
+        },
+        {
+          "id": "rejects-scope-error-for-policy-denial",
+          "type": "not_regex",
+          "pattern": "(every|all|any).{0,40}(policy|authorization).{0,50}insufficient_scope|(policy denial|scopes are sufficient).{0,80}(?<!without )insufficient_scope|(RBAC|policy|authorization).{0,80}(adequate|sufficient).{0,80}(answer with|return|emit|use).{0,30}(OAuth scope error|scope error|(?<!without )insufficient_scope)"
+        },
+        {
+          "id": "reserves-401-for-invalid-credentials",
+          "type": "contains_all",
+          "values": [
+            "401",
+            "missing or invalid credentials"
+          ]
+        },
+        {
+          "id": "distinguishes-malformed-authorization-request",
+          "type": "contains_all",
+          "values": [
+            "malformed authorization request",
+            "400 Bad Request",
+            "invalid_request"
+          ]
+        },
+        {
+          "id": "audits-without-sensitive-data",
+          "type": "contains_all",
+          "values": [
+            "redacted audit decision",
+            "correlation identifier"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Review an MCP OAuth design document. Do not implement or diagnose a live outage. Finish the skill's verification requirements.",
+      "expected_output": "Perform a read-only design review using the document and current standards. Keep the review offline; do not run live probes for an explanation or review. State assumptions, findings, and the focused metadata, authentication, scope, downgrade, and negative tests required before release. Broader checks are justified only by shared impact, repository release policy, or evidence of cross-cutting risk.",
+      "files": [],
+      "checks": [
+        {
+          "id": "keeps-review-read-only",
+          "type": "contains_all",
+          "values": [
+            "read-only design review",
+            "Keep the review offline",
+            "Do not run live probes",
+            "explanation or review"
+          ]
+        },
+        {
+          "id": "specifies-focused-future-evidence",
+          "type": "contains_all",
+          "values": [
+            "focused",
+            "metadata",
+            "authentication",
+            "scope",
+            "downgrade",
+            "negative tests"
+          ]
+        },
+        {
+          "id": "bounds-broader-checks",
+          "type": "contains_all",
+          "values": [
+            "Broader checks",
+            "shared impact",
+            "release policy",
+            "cross-cutting risk"
+          ]
+        },
+        {
+          "id": "does-not-prescribe-live-command",
+          "type": "not_regex",
+          "pattern": "\\b(curl|httpie|wget)\\b"
+        },
+        {
+          "id": "rejects-contradictory-production-probes",
+          "type": "not_regex",
+          "pattern": "(always|must|required|should).{0,60}(probe|request|GET|call|contact).{0,60}(production|deployed|live|remote)|(probe|request|GET|call|contact).{0,60}(production|deployed|live|remote).{0,60}(always|required|must)|(always|every|each|all).{0,40}(review|invocation|task).{0,80}(contact|probe|request|GET|call|query|reach).{0,80}(deployed|production|live|remote|endpoint)"
+        }
+      ]
+    }
+  ]
+}

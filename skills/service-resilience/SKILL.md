@@ -63,6 +63,15 @@ Apply controls in this order:
 
 Do not rely on autoscaling after queues, memory, or downstream capacity are already exhausted.
 
+Prevent synchronized load and respect downstream limits:
+
+- Treat concurrent throttling responses from one dependency as one event. Record a shared backoff per limited scope that every caller checks before sending, instead of running independent per-request backoff loops.
+- Back off only the scope the dependency reports as limited, such as one endpoint, resource, or tenant. Pause all traffic only for a shared quota.
+- Pace calls to a rate-limited dependency client-side at its steady-state limit, for example with a token bucket, and share that budget across every worker and process that consumes the same quota.
+- Treat `Retry-After` as the earliest allowed retry: never retry sooner, cap how long you will wait, and reschedule the work when the delay exceeds the deadline.
+- Collapse concurrent identical reads and cache refills into one in-flight request, and randomize cache expiry or refresh ahead of expiry so entries do not expire together.
+- Add random jitter to retries, reconnects, scheduled jobs, and fleet start times.
+
 ### 4. Isolate failure
 
 Choose bulkheads around workloads that should not consume one another's capacity:
@@ -129,6 +138,8 @@ Use the failure policy reference (`${HANDBOOK_ROOT}/skills/service-resilience/re
 | Sustained likely failure | Circuit breaker | Timeout, observability, recovery probe |
 | One workload starves another | Bulkhead | Priority, quotas, capacity plan |
 | Offered load exceeds capacity | Admission control and shedding | Backpressure and retry guidance |
+| Many callers retry or refresh at once | Shared scoped backoff and request coalescing | Jitter and randomized expiry |
+| Calling a rate-limited dependency | Client-side pacing to its published limit | Shared quota budget and `Retry-After` |
 | Optional dependency unavailable | Explicit fallback | Freshness and correctness contract |
 | Mutation timed out | Reconciliation | Stable operation ID or idempotency key |
 | Long asynchronous backlog | Queue-age limits | Consumer scaling, DLQ, replay policy |
@@ -137,6 +148,7 @@ Use the failure policy reference (`${HANDBOOK_ROOT}/skills/service-resilience/re
 
 - Retrying every exception at every layer.
 - Retrying non-idempotent mutations with a new request ID.
+- Letting every request or worker run its own backoff loop after a shared throttling event.
 - Circuit breaker keyed globally across unrelated tenants or operations.
 - Opening a breaker on caller validation or authorization failures.
 - Half-open mode releasing an unbounded probe flood.

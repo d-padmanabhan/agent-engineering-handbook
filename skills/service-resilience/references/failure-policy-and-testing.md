@@ -33,7 +33,7 @@ Classify outcomes before assigning retry or breaker behavior:
 - **Caller error**: return a stable client failure; do not retry or count against a dependency breaker.
 - **Authentication or authorization failure**: fail closed; do not fallback around policy.
 - **Business rejection**: return the domain outcome; it is not infrastructure failure.
-- **Ambiguous mutation**: reconcile authoritative state before unsafe repetition.
+- **Ambiguous mutation**: reconcile authoritative state before unsafe repetition. Reconciliation reads can lag the write, so a missing record is not proof that the mutation failed.
 - **Cancellation or expired deadline**: stop work and propagate cancellation.
 - **Programming defect**: surface and fix; do not mask with retries.
 

@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 
-This repository contains 52 Cursor rule files, 54 Agent Skills, 19 custom Cursor commands, and 32 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
+This repository contains 52 Cursor rule files, 56 Agent Skills, 19 custom Cursor commands, and 34 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
 
 The content is organized for progressive disclosure:
 
@@ -367,7 +367,7 @@ The repository currently contains 52 `.mdc` rule files. The following list highl
 
 ## Skill Catalog
 
-The repository currently contains 54 skill packages. Each directory listed below contains a `SKILL.md`.
+The repository currently contains 56 skill packages. Each directory listed below contains a `SKILL.md`.
 
 ### Engineering and Languages
 
@@ -393,6 +393,7 @@ The repository currently contains 54 skill packages. Each directory listed below
 - [AWS IAM](skills/aws-iam/)
 - [Codebase security audit](skills/codebase-security-audit/)
 - [IAM security advisor](skills/iam-security-advisor/)
+- [MCP resource-server OAuth](skills/mcp-resource-server-oauth/)
 - [Okta](skills/okta/)
 - [Security testing](skills/security-testing/)
 - [Workload identity](skills/workload-identity/)
@@ -433,6 +434,7 @@ The repository currently contains 54 skill packages. Each directory listed below
 ### Documentation and Artifacts
 
 - [Documentation standards and generated PNG diagrams](skills/documentation-standards/)
+- [Jira and Confluence authoring](skills/jira-confluence-authoring/)
 - [PDF export](skills/pdf-export/)
 - [React Flow architecture diagrams](skills/reactflow-architecture-diagrams/)
 - [Single-file dashboard](skills/single-file-dashboard/)
@@ -446,7 +448,7 @@ The repository currently contains 54 skill packages. Each directory listed below
 
 ## Skill Evaluation
 
-The dependency-free [Agent Skills eval harness](evals/) validates all skill metadata and the 32 available behavioral suites. Model-backed comparisons use an external command adapter; pull-request CI runs deterministic validation and unit tests without model credentials.
+The dependency-free [Agent Skills eval harness](evals/) validates all skill metadata and the 34 available behavioral suites. Model-backed comparisons use an external command adapter; pull-request CI runs deterministic validation and unit tests without model credentials.
 
 Current behavioral suites:
 
@@ -468,8 +470,10 @@ Current behavioral suites:
 - [Go and Rust systems](skills/go-rust-systems/evals/evals.json)
 - [IAM security advisor](skills/iam-security-advisor/evals/evals.json)
 - [Independent verification](skills/independent-verification/evals/evals.json)
+- [Jira and Confluence authoring](skills/jira-confluence-authoring/evals/evals.json)
 - [Kubernetes and containers](skills/kubernetes-containers/evals/evals.json)
 - [Kubernetes operator development](skills/kubernetes-operator-development/evals/evals.json)
+- [MCP resource-server OAuth](skills/mcp-resource-server-oauth/evals/evals.json)
 - [Memory architecture](skills/memory-architecture/evals/evals.json)
 - [Networking and transport](skills/networking-transport/evals/evals.json)
 - [Observability](skills/observability/evals/evals.json)
