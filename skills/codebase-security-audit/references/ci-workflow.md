@@ -37,10 +37,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: trufflehog
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.100.1 # no published major alias; exact stable tag
         with:
           path: ./
-          extra_args: --only-verified
+          extra_args: --no-verification
 
   # ---------------------------------------------------------------------------
   # Layer 2 - SAST (Semgrep multi-pack + language-specific tool)
@@ -49,7 +49,7 @@ jobs:
     name: sast (semgrep)
     runs-on: ubuntu-latest
     container:
-      image: returntocorp/semgrep:latest
+      image: semgrep/semgrep:1.187.0
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@master
+      - uses: aquasecurity/trivy-action@v0.36.0 # no published major alias; exact stable tag
         with:
           scan-type: fs
           scanners: vuln,license,secret,misconfig
@@ -128,13 +128,14 @@ jobs:
   sca-pip-audit:
     name: sca (pip-audit)
     runs-on: ubuntu-latest
-    if: hashFiles('requirements.txt', 'pyproject.toml', 'poetry.lock') != ''
+    if: hashFiles('requirements.txt') != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.14" }
       - run: pip install pip-audit
-      - run: pip-audit --strict
+      # Audit the declared requirements, not the runner's own environment.
+      - run: pip-audit --strict -r requirements.txt
 
   # PR-only: GitHub-native dependency review against the merge base.
   dependency-review:
@@ -160,7 +161,7 @@ jobs:
     if: hashFiles('**/*.tf', '**/*.yaml', '**/*.yml', '**/Dockerfile') != ''
     steps:
       - uses: actions/checkout@v4
-      - uses: bridgecrewio/checkov-action@master
+      - uses: bridgecrewio/checkov-action@v12
         with:
           framework: all
           soft_fail: false
@@ -168,6 +169,8 @@ jobs:
   # ---------------------------------------------------------------------------
   # Layer 8 - DAST (post-deploy, main only)
   # ---------------------------------------------------------------------------
+  # Passive only, against an owned non-production target that the security
+  # owner has authorized for automated scanning.
   dast-staging:
     name: dast (zap baseline · staging)
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -175,7 +178,7 @@ jobs:
     steps:
       - uses: zaproxy/action-baseline@v0.12.0
         with:
-          target: "https://staging.example.com"
+          target: "https://staging.acme.com"
 ```
 
 ## Companion: `dependabot.yml`
@@ -211,7 +214,8 @@ updates:
 ## Notes
 
 - Use `actions/checkout@v4` with `fetch-depth: 0` for any job that scans git history.
-- Pin third-party actions by SHA in security-sensitive repos (Dependabot will keep them updated).
+- Never use `@main`, `@master`, or `:latest`. Use each action's verified latest stable major alias, or its exact stable tag when no major alias is published, and pin by commit SHA in security-sensitive repositories. Verify current releases per `160-github-actions.mdc` before adopting this workflow; several actions above may have newer major versions that need a compatibility review.
+- TruffleHog verifies each detected credential with its issuing provider unless `--no-verification` is set; `--results=verified` only filters output. Remove `--no-verification` only with the security owner's explicit approval.
 - The CodeQL matrix should include every language present; add `javascript`, `go`, `java`, `cpp`, `csharp`, `ruby` as needed.
 - For private repos with GitHub Advanced Security, CodeQL alerts surface in the Security tab with autofix suggestions.
 - Substitute `sast-bandit` with `gosec`, `eslint-plugin-security`, `brakeman`, `spotbugs` per primary language.

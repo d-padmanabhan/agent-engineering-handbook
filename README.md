@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 
-This repository contains 52 Cursor rule files, 80 Agent Skills, 19 custom Cursor commands, and 34 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
+This repository contains 52 Cursor rule files, 80 Agent Skills, 19 custom Cursor commands, and 35 behavioral eval suites covering software design, languages, cloud platforms, infrastructure, security, identity, data, AI systems, and documentation.
 
 The content is organized for progressive disclosure:
 
@@ -477,7 +477,7 @@ An AWS skills installer adds and updates these skills through the `~/.cursor/ski
 
 ## Skill Evaluation
 
-The dependency-free [Agent Skills eval harness](evals/) validates all skill metadata and the 34 available behavioral suites. Model-backed comparisons use an external command adapter; pull-request CI runs deterministic validation and unit tests without model credentials.
+The dependency-free [Agent Skills eval harness](evals/) validates all skill metadata and the 35 available behavioral suites. Model-backed comparisons use an external command adapter; pull-request CI runs deterministic validation and unit tests without model credentials.
 
 Current behavioral suites:
 
@@ -488,6 +488,7 @@ Current behavioral suites:
 - [CI/CD with GitHub Actions](skills/cicd-github-actions/evals/evals.json)
 - [Cloudflare WAF authoring](skills/cloudflare-waf-author/evals/evals.json)
 - [Cloudflare Workers authoring](skills/cloudflare-workers-author/evals/evals.json)
+- [Codebase security audit](skills/codebase-security-audit/evals/evals.json)
 - [Containers and orchestration](skills/containers-orchestration/evals/evals.json)
 - [Core engineering](skills/core-engineering/evals/evals.json)
 - [Data engineering](skills/data-engineering/evals/evals.json)

@@ -107,7 +107,7 @@ Fast review pass. Use on any PR that adds LLM calls or tool invocations.
 
 **Deliverable:** review comments with principle references (golden rules 1-5) and concrete fixes.
 
-See [references/injection-threat-model.md](references/injection-threat-model.md) for a reusable threat model.
+See [references/injection-threat-model.md](references/injection-threat-model.md) for a reusable threat model. For auditing an existing codebase rather than reviewing a design, use the AI and agent checks in the codebase security audit manual-hunting reference (`${HANDBOOK_ROOT}/skills/codebase-security-audit/references/manual-hunting.md`).
 
 ---
 
@@ -231,4 +231,5 @@ Each of these is in `316-zero-trust.mdc` with principle and fix.
 - Rule: `500-ai-ml.mdc`, `510-mcp-servers.mdc` (AI and MCP patterns)
 - Rule: `020-agent-audit.mdc` (local agent guardrails)
 - Skill: `security-testing` (OWASP checklist + testing)
+- Skill: `codebase-security-audit` (evidence-gated audit of an existing codebase)
 - Skill: `mcp-development` (building MCP servers)
